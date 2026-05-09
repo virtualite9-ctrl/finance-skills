@@ -1,27 +1,21 @@
 ---
 name: funda-data
 description: >
-  Run analyst-grade fundamental-research questions against the Funda AI agent
-  via its MCP server at https://funda.ai/api/mcp. Backed by ~170 specialized
-  research skills plus a structured-data layer (filings, transcripts,
-  estimates, ownership, options structure). Covers earnings previews and
-  recaps, beat/miss decomposition, analyst estimate-revision trends, SEC
-  filing summaries (10-K/10-Q/8-K/S-1), earnings call transcript digestion,
-  company primers, competitive positioning, supply-chain mapping, sector
-  deep-dives (semis, pharma, banks, retail, energy, mining, housing,
-  consumer), DCF / comps modelling against caller-supplied assumptions,
-  capital-allocation review, macro framing (Fed stance, cycle position,
-  Dalio quadrant, sector rotation), and structural market data passthrough
-  (ownership flow, options structure, news, sentiment, prediction markets,
-  congressional trades). Triggers: "funda", "funda.ai", "funda agent",
-  earnings preview/recap, analyst estimates, DCF, comps, sector deep-dive,
-  supply chain, competitive positioning, 10-K/10-Q/8-K, transcript,
-  ownership flow, gamma exposure / options structure, Fed cycle, Dalio
-  quadrant, company primer. WILL REFUSE: real-time quotes, buy/sell/hold
-  recommendations, price targets, personalized investment advice,
-  portfolio allocation, tax/legal advice, trade execution. For raw
-  real-time prices use yfinance-data; for aggregated social sentiment use
-  finance-sentiment.
+  Run fundamental-research questions against the Funda AI agent via its
+  MCP at https://funda.ai/api/mcp. Backed by ~170 research skills plus a
+  structured-data layer (filings, transcripts, estimates, ownership,
+  options structure). Use for earnings previews/recaps, beat-miss
+  decomposition, estimate-revision trends, SEC filings (10-K/10-Q/8-K),
+  transcript digestion, company primers, competitive positioning,
+  supply-chain mapping, sector deep-dives (semis, pharma, banks, energy,
+  mining), DCF/comps against given assumptions, macro framing (Fed
+  stance, Dalio quadrant, sector rotation), and structural market data
+  (ownership flow, options structure, sentiment, prediction markets,
+  congressional trades). Triggers: "funda", "funda.ai", DCF, comps,
+  earnings preview/recap, analyst estimates, sector deep-dive, 10-K,
+  transcript, ownership flow, gamma exposure, company primer. REFUSES
+  real-time quotes, buy/sell calls, price targets, personalized advice
+  — route those to yfinance-data or finance-sentiment.
 ---
 
 # Funda AI Research Agent (MCP)
