@@ -73,12 +73,12 @@ Read-only social media and research feeds — Twitter/X, Discord, LinkedIn, Tele
 
 ### Data Providers (`finance-data-providers`)
 
-External API data — sentiment via Adanos, comprehensive data via Funda AI, and Hormuz Strait monitoring.
+External API data — sentiment via Adanos, fundamental research via the Funda AI MCP, and Hormuz Strait monitoring.
 
 | Skill | Description |
 |---|---|
 | [finance-sentiment](plugins/data-providers/skills/finance-sentiment/) | Stock sentiment research via Adanos Finance API — Reddit, X.com, news, Polymarket |
-| [funda-data](plugins/data-providers/skills/funda-data/) | [Funda AI](https://funda.ai) API — real-time quotes, fundamentals, options flow, sentiment, SEC filings, and 60+ endpoints |
+| [funda-data](plugins/data-providers/skills/funda-data/) | [Funda AI](https://funda.ai) MCP server (`https://funda.ai/api/mcp`) — analyst-grade research questions: earnings previews/recaps, DCF, sector deep-dives, filings, transcripts, ownership flow |
 | [hormuz-strait](plugins/data-providers/skills/hormuz-strait/) | Strait of Hormuz monitoring — shipping, oil impact, insurance risk, crisis timeline |
 
 ### Startup Tools (`finance-startup-tools`)
