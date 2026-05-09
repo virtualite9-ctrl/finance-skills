@@ -78,7 +78,7 @@ External API data — sentiment via Adanos, fundamental research via the Funda A
 | Skill | Description |
 |---|---|
 | [finance-sentiment](plugins/data-providers/skills/finance-sentiment/) | Stock sentiment research via Adanos Finance API — Reddit, X.com, news, Polymarket |
-| [funda-data](plugins/data-providers/skills/funda-data/) | [Funda AI](https://funda.ai) MCP server (`https://funda.ai/api/mcp`) — analyst-grade research questions: earnings previews/recaps, DCF, sector deep-dives, filings, transcripts, ownership flow |
+| [funda-data](plugins/data-providers/skills/funda-data/) | [Funda AI](https://funda.ai) — MCP server for analyst-grade research synthesis (DCF, earnings recaps, sector deep-dives, filings) plus REST API fallback for raw data (real-time quotes, options chains, financials, 60+ endpoints) |
 | [hormuz-strait](plugins/data-providers/skills/hormuz-strait/) | Strait of Hormuz monitoring — shipping, oil impact, insurance risk, crisis timeline |
 
 ### Startup Tools (`finance-startup-tools`)

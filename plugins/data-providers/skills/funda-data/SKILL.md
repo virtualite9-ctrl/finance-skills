@@ -1,146 +1,213 @@
 ---
 name: funda-data
 description: >
-  Run fundamental-research questions against the Funda AI agent via its
-  MCP at https://funda.ai/api/mcp. Backed by ~170 research skills plus a
-  structured-data layer (filings, transcripts, estimates, ownership,
-  options structure). Use for earnings previews/recaps, beat-miss
-  decomposition, estimate-revision trends, SEC filings (10-K/10-Q/8-K),
-  transcript digestion, company primers, competitive positioning,
-  supply-chain mapping, sector deep-dives (semis, pharma, banks, energy,
-  mining), DCF/comps against given assumptions, macro framing (Fed
-  stance, Dalio quadrant, sector rotation), and structural market data
-  (ownership flow, options structure, sentiment, prediction markets,
-  congressional trades). Triggers: "funda", "funda.ai", DCF, comps,
-  earnings preview/recap, analyst estimates, sector deep-dive, 10-K,
-  transcript, ownership flow, gamma exposure, company primer. REFUSES
-  real-time quotes, buy/sell calls, price targets, personalized advice
-  — route those to yfinance-data or finance-sentiment.
+  Query Funda AI financial data via two surfaces: the MCP server at
+  https://funda.ai/api/mcp for analyst-grade research synthesis (DCF,
+  comps, earnings previews/recaps, sector deep-dives, SEC filings,
+  transcripts, supply-chain mapping, ownership flow, macro framing) via
+  the agent_chat tool — OR the REST API at https://api.funda.ai/v1 with
+  FUNDA_API_KEY for raw data (real-time quotes, intraday candles, EOD
+  prices, financial statements, options chains/greeks/GEX, supply-chain
+  KG, social sentiment, news, calendars, FRED, ESG, congressional
+  trades, AI hiring signals). Triggers: "funda", "funda.ai", real-time
+  quote, stock price, intraday, balance sheet, income statement, options
+  chain, DCF, comps, earnings preview/recap, analyst estimates,
+  10-K/10-Q/8-K, transcript, ownership flow, gamma exposure, supply
+  chain, sector deep-dive, congressional trades, FRED. Prefer MCP for
+  synthesis/analysis questions; use REST for raw structured data the MCP
+  declines.
 ---
 
-# Funda AI Research Agent (MCP)
+# Funda AI Skill
 
-Funda exposes a [Model Context Protocol](https://modelcontextprotocol.io/)
-server at `https://funda.ai/api/mcp`. It surfaces a single tool,
-`agent_chat`, which runs a research question through Funda's analyst-grade
-agent and returns a synthesized, citation-grounded answer.
+Funda AI exposes two complementary surfaces backed by the same data:
 
-This is **not** a raw-data API — it's a research-question interface. Funda
-declines real-time prices, recommendations, and price targets. Route those
-elsewhere.
+| Surface | Best for | Auth | Output |
+|---|---|---|---|
+| **MCP** `agent_chat` at `https://funda.ai/api/mcp` | Research, analysis, synthesis | OAuth (auto via `claude mcp add`) | Synthesized text with disclaimer |
+| **REST** `/v1/*` at `https://api.funda.ai` | Raw structured data | `FUNDA_API_KEY` Bearer | JSON |
+
+Both require an active [Funda AI](https://funda.ai) subscription.
 
 ---
 
-## Step 1: Verify the Funda MCP Is Connected
+## Step 1: Decide Which Surface
+
+| User wants | Surface |
+|---|---|
+| DCF / comps walkthrough, sector view, transcript synthesis, company primer | MCP |
+| Earnings preview/recap with judgment, beat-miss decomposition, narrative framing | MCP |
+| Real-time or intraday quote, EOD price history | REST |
+| Raw options chain snapshot, greeks, GEX time series | REST |
+| Specific line item from a financial statement (single number, JSON) | REST |
+| 13F filings, insider trades, congressional trades as rows | REST |
+| News with structured sentiment / event timeline (JSON) | REST |
+| Bulk dataset downloads | REST |
+| AI-company hiring signals (OpenAI, Anthropic, Google, xAI) | REST |
+
+**Default to MCP** for ambiguous research-style questions. **Use REST** when
+the user wants machine-readable structured data — or when the MCP refuses
+(real-time prices, raw quotes).
+
+The MCP also refuses buy/sell calls, price targets, personalized
+portfolio advice, tax/legal advice, and trade execution. Those are out of
+scope for both surfaces — decline politely and don't fall through to REST
+hoping for a different answer.
+
+---
+
+## Step 2: MCP Flow (Research)
+
+### 2a. Verify the MCP is connected
 
 ```
-!`claude mcp list 2>/dev/null | grep -iE "^funda[[:space:]]" || echo "FUNDA_MCP_NOT_CONNECTED"`
+!`claude mcp list 2>/dev/null | grep -iE "^funda:" || echo "FUNDA_MCP_NOT_CONNECTED"`
 ```
 
-Then act on the result:
-
-- A line containing `funda` → the MCP is registered. The tool is callable as `mcp__funda__agent_chat`. Proceed to Step 2.
-- `FUNDA_MCP_NOT_CONNECTED` → ask the user to install and authorize:
+- A line starting with `funda:` → registered. The tool is callable as `mcp__funda__agent_chat`. Continue.
+- `FUNDA_MCP_NOT_CONNECTED` → ask the user to install:
   ```bash
   claude mcp add --transport http funda https://funda.ai/api/mcp
   ```
-  A browser tab opens for OAuth approval. The token lasts 1 hour and
-  auto-refreshes via a 30-day refresh token — they only see the consent
-  screen once. After approval the user must restart their Claude Code
-  session (or open a new one) so the tool registers.
+  A browser tab opens for OAuth approval (1-hour token + 30-day refresh, auto-managed). The Claude Code session may need to be restarted before the tool registers.
 
-Funda is paid-only. If the user is not on an active subscription, the MCP
-returns 403 with `subscription_required`. Direct them to https://funda.ai
-to activate.
+### 2b. Frame the question
 
----
-
-## Step 2: Frame the Question
-
-`agent_chat` is a fresh research turn with **no cross-call memory**. Each
-question must stand alone — bake the ticker, time horizon, and any
-specific assumptions into the question text itself.
+`agent_chat` is a fresh research turn with **no cross-call memory** — bake
+the ticker, time horizon, and assumptions into the question text itself.
 
 | User wants | Question shape |
 |---|---|
-| Earnings preview | "Preview MSFT's Q3 print Thursday — segment trends to watch, where consensus is aggressive/conservative, historical beat/miss pattern." |
-| Earnings recap | "Walk through NVDA Q2: beat/miss by segment, guide vs consensus, transcript Q&A color on data-center demand." |
-| Estimate revisions | "How have analyst estimates for AMZN's FY26 EPS shifted over the last 90 days, and what segments drove the revision?" |
-| Sector deep dive | "Summarize the 2026 hyperscaler capex cycle — spending tiers by name, supplier exposure, gross-margin implications." |
-| Supply chain | "Map TSMC's customer concentration and N2 ramp risks — name the top three exposures by revenue." |
+| Earnings preview | "Preview MSFT's Q3 print Thursday — segment trends, where consensus is aggressive/conservative, beat/miss pattern." |
+| Earnings recap | "Walk through NVDA Q2: beat/miss by segment, guide vs consensus, transcript Q&A on data-center demand." |
+| Sector deep-dive | "Summarize the 2026 hyperscaler capex cycle — spending tiers by name, supplier exposure, gross-margin implications." |
+| Supply chain | "Map TSMC's customer concentration and N2 ramp risks — top three exposures by revenue." |
 | Filing summary | "Diff the new risk factors in PLTR's latest 10-K versus the prior year." |
-| Transcript digestion | "Summarize the analyst Q&A from GOOGL's last earnings call — which themes drew the most pushback?" |
-| DCF methodology | "Walk through a DCF for NVDA assuming 25% data-center growth, 10% terminal margin, 9% WACC — surface the sensitivity table." |
-| Comps | "Build a comp set for SNOW — who belongs in it, what multiples apply, where does SNOW screen rich/cheap." |
-| Macro framing | "Where in the Dalio long-term debt cycle is the US, and what does that imply for duration positioning?" |
-| Competitive positioning | "Who actually competes with Palantir in federal civilian contracts, and how is the win rate trending?" |
-| Ownership flow | "Has institutional ownership of CRWD shifted in the latest 13F filings — net buyers vs sellers?" |
-| Options structure | "What does the gamma exposure profile and skew look like for SPY heading into Friday's close?" |
+| DCF | "Walk through a DCF for NVDA assuming 25% data-center growth, 10% terminal margin, 9% WACC — surface the sensitivity table." |
+| Macro | "Where in the Dalio long-term debt cycle is the US, and what does that imply for duration positioning?" |
+| Ownership | "Has institutional ownership of CRWD shifted in the latest 13F filings — net buyers vs sellers?" |
 
 If the user gave only a ticker, ask one clarifying question to scope the
-turn (preview? recap? primer? DCF?) before calling. A vague question burns
-a turn and returns a vague answer.
+turn (preview? recap? primer? DCF?) before calling — vague questions burn
+a turn and return vague answers.
+
+If the user is following up on a prior Funda response, quote the relevant
+paragraph back inside the new question; the agent has no memory of prior
+calls.
 
 For more example questions per topic, see `references/research-topics.md`.
 
----
-
-## Step 3: Confirm It's In Scope
-
-Funda's agent will decline these — don't waste a turn:
-
-- Real-time / intraday quotes, live market data
-- Buy / sell / hold calls, conviction recommendations, price targets
-- Personalized investment advice, portfolio allocation, position sizing
-- Tax, legal, or regulatory advice
-- Trade execution
-
-Route elsewhere when needed:
-
-| User wants | Use this skill instead |
-|---|---|
-| Real-time price, intraday candles, options chain snapshot | `yfinance-data` |
-| Aggregated cross-platform social sentiment scores | `finance-sentiment` |
-| SEPA / Minervini trend-template screening | `sepa-strategy` |
-| Strait of Hormuz / oil shipping risk | `hormuz-strait` |
-
----
-
-## Step 4: Call the Tool
-
-Invoke the MCP tool with the framed question:
+### 2c. Call the tool
 
 ```
 mcp__funda__agent_chat(question: "<full research question>")
 ```
 
-A typical run takes 15–60 seconds; the server streams progress
-notifications throughout, so the client doesn't time out.
+Typical run is 15–60 seconds; the server streams progress notifications
+throughout, so the client doesn't time out.
 
 Response shape:
-- `content[0].text` — answer text, prefixed with the Funda disclaimer
-  (`[Funda research output — fundamental analysis, informational only…]`).
-  Keep the prefix; do not strip it.
-- `_meta["funda.io/conversation_id"]` — UUID for the in-app history page
-  at `https://funda.ai/agent-chat/<id>`. Cite this so the user can inspect
-  the agent's full timeline and tool calls.
-- `_meta["funda.io/timed_out"]` — `true` if the agent hit its run budget
-  before finishing. The answer is partial; offer to resubmit a more
-  focused question.
+- `content[0].text` — answer prefixed with `[Funda research output — fundamental analysis, informational only…]`. Keep the prefix.
+- `_meta["funda.io/conversation_id"]` — UUID. The in-app history page is `https://funda.ai/agent-chat?c=<id>` (the `/agent-chat` route redirects to `/agent-chat-v2?c=<id>`).
+- `_meta["funda.io/timed_out"]` — `true` if the agent hit its run budget. Answer is partial; offer to retry with a tighter scope.
+
+If the call returns 403 `subscription_required`, the MCP is registered
+but the account isn't subscribed — direct the user to https://funda.ai
+to activate.
+
+Each call costs a research turn. Don't speculatively re-call with a
+rephrased question if the first answer was reasonable.
 
 ---
 
-## Step 5: Respond to the User
+## Step 3: REST Flow (Raw Data)
 
-- Surface the agent's synthesis with structure (tables, bullets, headings) — don't dump the raw blob.
-- Preserve the disclaimer; never repackage Funda's analysis as a recommendation, price target, or trade signal.
-- Cite the conversation URL: `Full Funda research: https://funda.ai/agent-chat/{conversation_id}`.
-- If `timed_out` is true, note the answer is partial and offer to retry with a tighter scope.
+### 3a. Resolve FUNDA_API_KEY
+
+The skill resolves `FUNDA_API_KEY` in this order:
+1. `FUNDA_API_KEY` environment variable
+2. `FUNDA_API_KEY` in `.env` in the current directory
+3. `FUNDA_API_KEY` in `.env` at the git repo root (so a worktree inherits the key from the main checkout)
+
+```
+!`if [ -n "$FUNDA_API_KEY" ]; then echo "KEY_FROM_ENV_VAR"; elif [ -f .env ] && grep -qE "^FUNDA_API_KEY=" .env; then echo "KEY_FROM_LOCAL_DOTENV:$(pwd)/.env"; else GIT_COMMON=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); if [ -n "$GIT_COMMON" ]; then ROOT=$(dirname "$GIT_COMMON"); if [ -f "$ROOT/.env" ] && grep -qE "^FUNDA_API_KEY=" "$ROOT/.env"; then echo "KEY_FROM_ROOT_DOTENV:$ROOT/.env"; else echo "KEY_NOT_SET"; fi; else echo "KEY_NOT_SET"; fi; fi`
+```
+
+Then act on the result:
+
+- `KEY_FROM_ENV_VAR` — use `$FUNDA_API_KEY` directly in curl calls.
+- `KEY_FROM_LOCAL_DOTENV:<path>` / `KEY_FROM_ROOT_DOTENV:<path>` — load once before calling:
+  ```bash
+  export FUNDA_API_KEY=$(grep -E "^FUNDA_API_KEY=" <path> | head -1 | cut -d= -f2- | sed 's/^["'\'']//;s/["'\'']$//')
+  ```
+- `KEY_NOT_SET` — ask the user for their key. They can either `export FUNDA_API_KEY="..."` or add `FUNDA_API_KEY=...` to `.env` at the repo root (preferred for worktrees).
+
+### 3b. Find the right endpoint
+
+Match the user's request to a category and read the corresponding
+reference file for full parameters and response schemas.
+
+| Category | Endpoint family | Reference |
+|---|---|---|
+| Real-time / batch / aftermarket quotes | `/v1/quotes?type=...` | `references/market-data.md` |
+| Historical EOD, intraday candles, technical indicators | `/v1/stock-price`, `/v1/charts` | `references/market-data.md` |
+| Commodity / forex / crypto quotes | `/v1/quotes?type=commodity-quotes` | `references/market-data.md` |
+| Income / balance / cash flow / metrics / ratios | `/v1/financial-statements` | `references/fundamentals.md` |
+| Company profile, peers, shares float, search, screener, list | `/v1/company-profile`, `/v1/company-details`, `/v1/search`, `/v1/companies` | `references/fundamentals.md` |
+| Analyst estimates, price targets, grades, DCF, ratings | `/v1/analyst?type=...` | `references/fundamentals.md` |
+| Options chain, greeks, GEX, IV, max pain, flow, screener | `/v1/options/...` | `references/options.md` |
+| Supply-chain KG: suppliers, customers, competitors, partners | `/v1/supply-chain/...` | `references/supply-chain.md` |
+| Twitter, Reddit, Polymarket, government trading, ownership | `/v1/twitter-posts`, `/v1/reddit-posts`, `/v1/polymarket/...`, `/v1/government-trading`, `/v1/ownership` | `references/alternative-data.md` |
+| AI-enriched news + aggregated sentiment + event timeline | `/v1/news/ticker`, `/v1/news/timeline`, `/v1/news/sentiment` | `references/news-enriched.md` |
+| SEC filings, earnings/podcast transcripts, research reports | `/v1/sec-filings`, `/v1/transcripts`, `/v1/investment-research-reports` | `references/filings-transcripts.md` |
+| Earnings / dividend / IPO / splits / economic calendar | `/v1/calendar?type=...` | `references/calendar-economics.md` |
+| Treasury rates, GDP/CPI indicators, FRED, risk premium | `/v1/economics`, `/v1/fred` | `references/calendar-economics.md` |
+| Stock news, gainers/losers, ETF holdings, ESG, COT, bulk, market hours | `/v1/news`, `/v1/market-performance`, `/v1/funds`, `/v1/esg`, `/v1/cot-report`, `/v1/bulk`, `/v1/market-hours` | `references/other-data.md` |
+| AI-company hiring signals (OpenAI, Anthropic, Google, xAI, Mercor, SurgeAI) | `/v1/recruit-...` | `references/recruit.md` |
+| Claude API proxy via Bedrock | `/v1/claude/v1/messages` | `references/claude-proxy.md` |
+
+### 3c. Call the endpoint
+
+```bash
+curl -s -H "Authorization: Bearer $FUNDA_API_KEY" \
+  "https://api.funda.ai/v1/<endpoint>?<params>" | python3 -m json.tool
+```
+
+All responses are `{"code": "0", "message": "", "data": ...}`. A non-zero
+`code` is an error — read `message`.
+
+List endpoints paginate: `{"items": [...], "page": 0, "page_size": 20, "next_page": 1, "total_count": N}`. Pages are 0-based; `next_page` is `-1` when exhausted.
+
+For broad ticker overviews ("tell me about AAPL"), combine a few REST
+calls: `/v1/company-profile` for sector/CEO/mcap/price + `/v1/financial-statements?type=key-metrics-ttm` + `/v1/analyst?type=price-target-summary`.
+
+---
+
+## Step 4: Respond to the User
+
+- For MCP synthesis: surface with structure (tables, bullets, headings) — don't dump the raw blob. Preserve the Funda disclaimer; never repackage analysis as a recommendation, price target, or trade signal.
+- For MCP responses, cite `https://funda.ai/agent-chat?c={conversation_id}` so the user can inspect the agent's full timeline.
+- For REST responses, format numbers cleanly (prices to 2 decimals, ratios to 2-4, large numbers with commas or abbreviations like `$2.8T`). Use tables for comparative data; summarize trends rather than dumping time series.
 - For DCF / valuation work, surface the assumptions Funda used so the user can adjust them.
-- Note the data source: "Research synthesized by the Funda AI agent."
+- Note the source: "Funda AI" (whether MCP or REST).
+- Never provide trading recommendations — present the data and let the user draw conclusions.
 
 ---
 
 ## Reference Files
 
-- `references/research-topics.md` — categorized example questions, what Funda excels at vs declines, and tips for framing multi-step research.
+**MCP path:**
+- `references/research-topics.md` — categorized example questions and tips for framing `agent_chat` queries.
+
+**REST path:**
+- `references/market-data.md` — quotes, historical prices, charts, technical indicators
+- `references/fundamentals.md` — financial statements, company profile/details, search/screener, analyst, companies list
+- `references/options.md` — chains, greeks, GEX, flow, IV, screener, contract-level data
+- `references/supply-chain.md` — supply-chain KG, relationships, graph traversal
+- `references/alternative-data.md` — Twitter, Reddit, Polymarket, government trading, ownership
+- `references/news-enriched.md` — AI-enriched news, event timeline, aggregated sentiment
+- `references/filings-transcripts.md` — SEC filings, earnings/podcast transcripts, research reports
+- `references/calendar-economics.md` — calendars, economics, treasury, FRED
+- `references/other-data.md` — news, market performance, funds, ESG, COT, bulk, market hours
+- `references/recruit.md` — AI-company hiring signals, JD classifications, product clusters, launch probabilities
+- `references/claude-proxy.md` — Claude API proxy via Bedrock

@@ -1,64 +1,84 @@
 # Funda Data
 
-Run analyst-grade fundamental-research questions against the [Funda AI](https://funda.ai) agent via its [Model Context Protocol](https://modelcontextprotocol.io/) server at `https://funda.ai/api/mcp`.
+Query [Funda AI](https://funda.ai) financial data via two complementary surfaces:
 
-This skill is a thin guide around a single MCP tool, `agent_chat`, which executes a research question through Funda's agent (~170 specialized research skills + a structured-data layer covering filings, transcripts, estimates, ownership flow, options structure, sentiment, and prediction markets) and returns a synthesized, citation-grounded answer.
+- **MCP server** at `https://funda.ai/api/mcp` — single `agent_chat` tool for analyst-grade research synthesis. OAuth (auto via `claude mcp add`).
+- **REST API** at `https://api.funda.ai/v1` — 60+ endpoints for raw structured data. `FUNDA_API_KEY` Bearer auth.
+
+The skill prefers the MCP for research/analysis questions and falls back to REST for raw data the MCP declines (real-time quotes, intraday candles, raw options chains, single line items, bulk downloads).
 
 ## Triggers
 
-- Earnings previews and recaps, beat/miss decomposition
+**MCP path** (synthesis):
+- Earnings previews/recaps, beat-miss decomposition
 - Analyst estimate-revision trends
-- SEC filing summaries (10-K, 10-Q, 8-K, S-1, proxies)
+- SEC filing summaries (10-K, 10-Q, 8-K, S-1)
 - Earnings call transcript digestion
 - Company primers, competitive positioning, supply-chain mapping
-- Sector deep-dives (semis, pharma, banks, retail, energy, mining, housing, consumer)
+- Sector deep-dives (semis, pharma, banks, retail, energy, mining, housing)
 - DCF and comps modelling against caller-supplied assumptions
-- Capital-allocation review
-- Macro framing (Fed stance, cycle position, Dalio quadrant, sector rotation)
-- Structural market data passthrough (ownership flow, options structure, news, sentiment, prediction markets, congressional trades)
-- Any mention of "funda", "funda.ai", or "funda agent"
+- Macro framing (Fed stance, Dalio quadrant, sector rotation)
 
-## Out of Scope
+**REST path** (raw data):
+- Real-time / intraday / EOD prices and quotes
+- Financial statements (income, balance sheet, cash flow) as structured JSON
+- Options chains, greeks, GEX, IV, max pain, flow alerts
+- Supply-chain knowledge graph (raw edges)
+- Twitter, Reddit, Polymarket, congressional trades, ownership (13F)
+- News, calendars, FRED, ESG, COT, AI-company hiring signals
 
-The Funda agent will refuse and should not be asked for:
+Triggers on any mention of "funda", "funda.ai", or specific endpoints/topics above.
 
-- Real-time / intraday quotes, live market data
-- Buy / sell / hold recommendations, conviction calls, price targets
-- Personalized investment advice, portfolio allocation, position sizing
-- Tax / legal / regulatory advice
-- Trade execution
+## Out of Scope (Both Surfaces)
 
-For real-time prices use `yfinance-data`. For aggregated social sentiment use `finance-sentiment`. For trading-strategy frameworks use `sepa-strategy`.
+The Funda agent (and this skill) will not:
+
+- Issue buy / sell / hold recommendations or price targets
+- Provide personalized investment advice or portfolio allocation
+- Give tax, legal, or regulatory advice
+- Execute trades
 
 ## Platform
 
-**CLI only** — requires Claude Code (or another MCP-aware client) so the `claude mcp add` setup works.
+**CLI only** — requires Claude Code (or another MCP-aware client with shell access) so `claude mcp add` and the curl-based REST flow both work.
 
 ## Setup
 
-> **Paid service** — A [Funda AI](https://funda.ai) subscription is required. The MCP server returns 403 `subscription_required` for unsubscribed users.
+> **Paid service** — A [Funda AI](https://funda.ai) subscription is required. The MCP returns 403 `subscription_required` and the REST API rejects unsubscribed keys.
 
-1. Register the Funda MCP with Claude Code:
-   ```bash
-   claude mcp add --transport http funda https://funda.ai/api/mcp
-   ```
-2. A browser tab opens to `https://funda.ai/oauth/authorize`. Approve.
-3. Restart your Claude Code session so the tool registers.
+### MCP
 
-The OAuth access token lasts 1 hour and auto-refreshes via a 30-day refresh token. You won't see another consent screen unless you sign out or revoke access.
+```bash
+claude mcp add --transport http funda https://funda.ai/api/mcp
+```
+
+A browser tab opens for OAuth. The access token lasts 1 hour and auto-refreshes via a 30-day refresh token. Restart your Claude Code session after approval so the tool registers.
 
 To remove later: `claude mcp remove funda`.
 
+### REST
+
+Get an API key from Funda AI, then either:
+
+```bash
+export FUNDA_API_KEY="your-api-key-here"
+```
+
+…or add `FUNDA_API_KEY=...` to `.env` at the repo root (preferred when working across worktrees — the skill resolves the key from env, local `.env`, then the repo-root `.env`).
+
 ## Reference Files
 
-| File | Description |
-|---|---|
-| `references/research-topics.md` | Categorized example questions, what Funda excels at vs declines, and tips for framing multi-step research |
-
-## How It Works
-
-The MCP exposes a single tool, `mcp__funda__agent_chat`, with one parameter: `question` (string, 1–4000 chars). Each call is a fresh research turn with no cross-call memory — bake the ticker, time horizon, and assumptions into the question itself.
-
-Typical run is 15–60 seconds; the server streams progress notifications during the run so the client doesn't time out.
-
-The response is text prefixed with a Funda disclaimer, plus metadata containing `funda.io/conversation_id` (a UUID for the in-app history page at `https://funda.ai/agent-chat/<id>`) and `funda.io/timed_out` (true if the agent hit its run budget).
+| File | Path | Description |
+|---|---|---|
+| `references/research-topics.md` | MCP | Example research questions per topic and framing tips for `agent_chat` |
+| `references/market-data.md` | REST | Quotes, historical prices, charts, technical indicators |
+| `references/fundamentals.md` | REST | Financial statements, company details, search/screener, analyst data |
+| `references/options.md` | REST | Chains, greeks, GEX, flow, IV, screener, contracts |
+| `references/supply-chain.md` | REST | Supply-chain KG, relationships, graph traversal |
+| `references/alternative-data.md` | REST | Twitter, Reddit, Polymarket, government trading, ownership |
+| `references/news-enriched.md` | REST | AI-enriched news, event timeline, aggregated sentiment |
+| `references/filings-transcripts.md` | REST | SEC filings, earnings/podcast transcripts, research reports |
+| `references/calendar-economics.md` | REST | Calendars, economics, treasury, FRED |
+| `references/other-data.md` | REST | News, market performance, funds, ESG, COT, bulk |
+| `references/recruit.md` | REST | AI-company hiring signals |
+| `references/claude-proxy.md` | REST | Claude API proxy via Bedrock |

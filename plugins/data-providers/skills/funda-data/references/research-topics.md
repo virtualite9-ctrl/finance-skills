@@ -54,27 +54,6 @@ assumptions for you, and the output is methodology, not a price target.
 - "What is Polymarket pricing for the 2026 Fed rate path?"
 - "Show recent congressional trades in semiconductor names and any cluster patterns."
 
-## Out of Scope — Funda Will Refuse
-
-The agent declines and routes elsewhere when asked for:
-
-- Real-time prices, intraday quotes, live market data
-- Buy / sell / hold calls, conviction recommendations, price targets
-- Personalized portfolio allocation or position sizing
-- Tax, legal, or regulatory advice
-- Trade execution or order routing
-
-Use these skills instead:
-
-| User wants | Skill |
-|---|---|
-| Real-time / intraday prices, options chain snapshot | `yfinance-data` |
-| Aggregated cross-platform social sentiment scores | `finance-sentiment` |
-| SEPA / Minervini trend-template screening | `sepa-strategy` |
-| Strait of Hormuz oil-shipping risk | `hormuz-strait` |
-| Earnings preview / recap from Yahoo data | `earnings-preview` / `earnings-recap` |
-| Analyst estimate trend deep-dive | `estimate-analysis` |
-
 ## Tips for Framing
 
 - **Stand-alone questions.** Each `agent_chat` call is a fresh turn with no memory of prior calls. Re-state the ticker, horizon, and assumptions every time.
