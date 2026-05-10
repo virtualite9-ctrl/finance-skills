@@ -73,13 +73,14 @@ Read-only social media and research feeds — Twitter/X, Discord, LinkedIn, Tele
 
 ### Data Providers (`finance-data-providers`)
 
-External API data — sentiment via Adanos, comprehensive data via Funda AI, and Hormuz Strait monitoring.
+External API data — sentiment via Adanos, comprehensive data via Funda AI, Hormuz Strait monitoring, and TradingView desktop app reading.
 
 | Skill | Description |
 |---|---|
 | [finance-sentiment](plugins/data-providers/skills/finance-sentiment/) | Stock sentiment research via Adanos Finance API — Reddit, X.com, news, Polymarket |
 | [funda-data](plugins/data-providers/skills/funda-data/) | [Funda AI](https://funda.ai) API — real-time quotes, fundamentals, options flow, sentiment, SEC filings, and 60+ endpoints |
 | [hormuz-strait](plugins/data-providers/skills/hormuz-strait/) | Strait of Hormuz monitoring — shipping, oil impact, insurance risk, crisis timeline |
+| [tradingview-reader](plugins/data-providers/skills/tradingview-reader/) | Read-only TradingView desktop reader — quotes, full options chains with greeks/IV, expiries, chart state, screenshots — via [opencli](https://github.com/jackwener/opencli) + CDP |
 
 ### Startup Tools (`finance-startup-tools`)
 

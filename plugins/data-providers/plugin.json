@@ -1,6 +1,6 @@
 {
   "name": "finance-data-providers",
-  "description": "External API data — sentiment via Adanos, comprehensive data via Funda AI, and Hormuz Strait monitoring.",
+  "description": "External API data — sentiment via Adanos, comprehensive data via Funda AI, Hormuz Strait monitoring, and TradingView desktop reader.",
   "version": "6.2.0",
   "author": {
     "name": "himself65"
@@ -15,6 +15,9 @@
     "funda",
     "geopolitical",
     "oil",
-    "data-provider"
+    "data-provider",
+    "tradingview",
+    "options",
+    "opencli"
   ]
 }
