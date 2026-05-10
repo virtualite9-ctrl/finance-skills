@@ -3,20 +3,19 @@ name: tradingview-reader
 description: >
   Read TradingView desktop app for market data, news, alerts, watchlists,
   and screener results using opencli (read-only).
-  Use this skill whenever the user wants spot quotes, options chains,
-  options expiries, screener / movers / heatmap results, news headlines or
-  full stories, alerts list / fire log / offline fires, watchlists, symbol
-  search / autocomplete, chart state, or screenshots from their local
-  TradingView.app. Triggers include: "options chain for X", "what's the IV
-  on Y", "show me SNDK puts", "TradingView screener for X sector",
-  "screen for stocks with RSI < 30", "TV gainers", "crypto by market cap",
-  "TradingView news on AAPL", "what news is breaking on $SPY",
-  "show my TradingView watchlists", "what's on my red flag list",
-  "list my TradingView alerts", "what alerts fired while I was away",
-  "search TradingView for nvidia", "what symbol is on my chart",
-  "screenshot my NVDA chart", "TradingView IV skew", "TV expiries for X".
-  This skill is READ-ONLY — it does NOT place trades, modify watchlists,
-  or change chart layouts. Write endpoints are not exposed.
+  Use this skill whenever the user wants quotes, options chains, options
+  expiries, screener results across stocks/crypto/forex/futures/bonds,
+  gainers/losers/movers, news headlines or full story bodies, alerts
+  (active list, fire log, offline fires), watchlists including colored
+  flag lists, symbol search/autocomplete, chart state, or screenshots
+  from their local TradingView.app. Triggers include: "options chain for
+  X", "IV on Y", "show me SNDK puts", "TV screener for Y sector", "screen
+  oversold stocks", "TV gainers", "crypto by market cap", "TradingView
+  news on AAPL", "show my watchlists", "red flag list", "list my alerts",
+  "what alerts fired", "search TV for nvidia", "what symbol is on my
+  chart", "screenshot NVDA chart", "TradingView IV skew", "TV expiries
+  for X". This skill is READ-ONLY — it does NOT place trades, modify
+  watchlists, or change chart layouts.
 ---
 
 # TradingView Reader (Read-Only)
