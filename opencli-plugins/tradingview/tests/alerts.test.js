@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAlerts } from '../alerts.js';
+import { normalizeAlerts } from '../lib/alerts.js';
 
 test('normalizeAlerts — live shape: { s: "ok", r: [...] }', () => {
   // Captured from live pricealerts.tradingview.com/list_alerts
