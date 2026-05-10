@@ -282,6 +282,191 @@ opencli tradingview screenshot --output ~/research/sndk-2026-05-10.png
 
 ---
 
+---
+
+### screener
+
+Generic stock / crypto / forex / futures / bond screener via `scanner.tradingview.com/{market}/scan2`. Same backend powers all of TradingView's screener, movers, and heatmap pages.
+
+```bash
+# US stocks with RSI(1h) below 30, sorted by volume
+opencli tradingview screener \
+    --market america \
+    --columns "name,close,RSI|60,volume,market_cap_basic,sector.tr" \
+    --filter '[{"left":"RSI|60","operation":"less","right":30}]' \
+    --sort volume:desc \
+    --limit 25 -f json
+
+# Top 50 crypto by market cap
+opencli tradingview screener \
+    --market coin \
+    --columns "name,close,change,market_cap_calc,total_volume_calc" \
+    --sort market_cap_calc:desc --limit 50 -f json
+
+# Specific ticker subset (skip filter, supply tickers explicitly)
+opencli tradingview screener \
+    --market america \
+    --tickers "NASDAQ:AAPL,NASDAQ:MSFT,NASDAQ:NVDA" \
+    --columns "name,close,change,market_cap_basic,price_earnings_ttm" -f json
+```
+
+| Flag | Required | Default | Notes |
+|---|---|---|---|
+| `--market` | no | `america` | Market path segment (see "Market codes" below) |
+| `--columns` | no | `name,close,change,volume,market_cap_basic,sector.tr` | CSV. Append `|TF` for indicator timeframe, e.g. `RSI|60` for 1h RSI |
+| `--filter` | no | — | JSON array of `{left, operation, right}` clauses |
+| `--sort` | no | `volume:desc` | `field:asc` or `field:desc` |
+| `--tickers` | no | — | Comma-separated `EXCH:SYM` list. Bypasses filter when set. |
+| `--label-product` | no | `screener-stock` | Server-side analytics tag (`screener-stock`, `screener-crypto`, ...) |
+| `--limit` | no | `50` | Max rows; clamped to `[1, 500]` |
+| `--offset` | no | `0` | Pagination start |
+
+**Market codes**
+
+- Stocks (per country): `america`, `uk`, `germany`, `france`, `japan`, `india`, `china`, `hongkong`, `korea`, `taiwan`, `singapore`, `australia`, `canada`, `brazil`, `mexico`, `israel`, `saudi`, etc. (~70 codes)
+- Cross-class: `crypto` (CEX pairs), `coin` (crypto coins, different schema), `forex`, `futures`, `bond`, `cfd`, `economics2`, `options`, `global`
+
+**Filter operations**
+
+`equal`, `nequal`, `greater`, `egreater`, `less`, `eless`, `in_range`, `not_in_range`, `empty`, `nempty`, `match` (substring), `nmatch`, `crosses`, `crosses_above`, `crosses_below`, `above%`, `below%`, `in_range%`. For boolean composition use the `filter2: {operator, operands}` field directly via the page-context API (not currently exposed via `--filter`).
+
+**Field catalog**
+
+3,000+ stock fields (1,018 deduplicated). See [TradingView-Screener fields reference](https://shner-elmo.github.io/TradingView-Screener/fields/stocks.html) for the full list. Common ones:
+
+- Price: `close`, `open`, `high`, `low`, `change`, `change_abs`, `gap`, `volume`, `volume_change`
+- Fundamentals: `market_cap_basic`, `price_earnings_ttm`, `price_book_fq`, `dividend_yield_recent`, `earnings_per_share_basic_ttm`, `revenue_ttm`, `total_debt`, `return_on_equity_fy`
+- Technicals: `RSI`, `RSI|<tf>`, `MACD.macd`, `MACD.signal`, `BB.upper`, `BB.lower`, `ATR`, `ADX`, `Aroon.Up`, `Aroon.Down`, `MOM`, `Mom`, `Stoch.K`, `Stoch.D`
+- Recommendation: `Recommend.All`, `Recommend.MA`, `Recommend.Other` (range -1..1)
+- Categorical: `type`, `subtype`, `sector`, `sector.tr` (translated), `industry`, `industry.tr`, `country`, `exchange`
+
+#### Common analyst workflows
+
+- **Oversold scan:** `--filter '[{"left":"RSI|60","operation":"less","right":30}]' --sort volume:desc` → high-volume names with 1h RSI < 30.
+- **Earnings beats:** `--filter '[{"left":"earnings_per_share_basic_ttm","operation":"egreater","right":0},{"left":"eps_surprise_percent_fq","operation":"greater","right":5}]'`.
+- **Sector rotation:** group results by `sector.tr` after pulling top 200 by `change`.
+- **Index constituents:** use `--tickers` with the SP500 / Nasdaq100 list to pull the same row set across multiple metrics in one call.
+
+---
+
+### search
+
+Symbol / instrument autocomplete. Backed by `symbol-search.tradingview.com/symbol_search/v3/`. Use this whenever the user's ticker is ambiguous (e.g. "SPY" matches multiple listings) or to discover available exchanges for a name.
+
+```bash
+opencli tradingview search --query "nvidia" -f json
+opencli tradingview search --query "BTC" --type crypto --exchange BINANCE -f json
+opencli tradingview search --query "9988" --country HK
+```
+
+| Flag | Required | Default | Notes |
+|---|---|---|---|
+| `--query` | yes | — | Search text; supports `EXCH:SYM` parsing |
+| `--type` | no | all | `stock`, `funds`, `index`, `futures`, `forex`, `crypto`, `bond`, `economic`, `dr`, `cfd`, `option`, `structured` |
+| `--exchange` | no | — | `NASDAQ`, `NYSE`, `NYSEARCA`, `BINANCE`, `OANDA`, ... |
+| `--country` | no | — | ISO-2 (`US`, `GB`, `JP`, `HK`, `DE`, ...) |
+| `--lang` | no | `en` | Description language |
+| `--limit` | no | `20` | Max results |
+| `--offset` | no | `0` | Pagination start |
+
+**Output columns:** `symbol` (full `EXCH:SYM`), `description`, `type`, `exchange`, `country`, `currency`.
+
+---
+
+### news
+
+TradingView's news headlines feed (or full story). Backed by `news-headlines.tradingview.com/v2/`. Two modes:
+
+- **List** (default): paginated headlines, filterable by symbol / category / area / section / provider.
+- **Story** (`--id <story-id>`): one row with the full story body flattened to plain text.
+
+```bash
+# Global news feed
+opencli tradingview news --limit 25 -f json
+
+# Ticker-specific news
+opencli tradingview news --symbol NASDAQ:AAPL --limit 10 -f json
+
+# Analyst notes only, on Reuters
+opencli tradingview news --section analysis --provider reuters -f json
+
+# Full story by id
+opencli tradingview news --id "tag:reuters.com,2026:newsml_..." -f json
+```
+
+| Flag | Required | Default | Notes |
+|---|---|---|---|
+| `--id` | no | — | When set, fetch full story instead of list |
+| `--symbol` | no | — | `EXCH:SYM` filter (omit for global feed) |
+| `--category` | no | — | `base`, `stock`, `etf`, `futures`, `forex`, `crypto`, `index`, `bond`, `economic` |
+| `--area` | no | — | `WLD`, `AME`, `EUR`, `ASI`, `OCN`, `AFR` |
+| `--section` | no | — | `press_release`, `financial_statement`, `insider_trading`, `esg`, `corp_activity`, `analysis`, `recommendation`, `prediction`, `markets_today`, `survey` |
+| `--provider` | no | — | Single source (`reuters`, `dow_jones`, `cointelegraph`, ...) |
+| `--lang` | no | `en` | Story language |
+| `--limit` | no | `25` | Max headlines |
+
+**Output columns (list mode):** `id`, `published`, `provider`, `title`, `urgency`, `related_symbols`, `link`.
+
+**Output columns (story mode):** `id`, `published`, `provider`, `title`, `body` (plain-text rendering of the AST), `tags`, `link`.
+
+#### Common analyst workflows
+
+- **Pre-market scan:** `news --section markets_today --area AME --limit 20` for the morning brief.
+- **Earnings call follow-up:** `news --symbol <S> --section press_release` → original release text via `news --id <id>` for AI summarization.
+- **Recommendation tracking:** `news --section recommendation --symbol <S>` for upgrades/downgrades.
+
+---
+
+### watchlists
+
+Read-only access to the user's watchlists.
+
+```bash
+# List all custom watchlists (id, name, count, symbols)
+opencli tradingview watchlists -f json
+
+# Symbols in one watchlist
+opencli tradingview watchlists --id rRwIJoVm -f json
+
+# Colored-flag list (red, orange, yellow, green, blue, purple)
+opencli tradingview watchlists --color red -f json
+```
+
+| Flag | Required | Default | Notes |
+|---|---|---|---|
+| `--id` | no | — | 8-char watchlist id (mutually exclusive with `--color`) |
+| `--color` | no | — | One of: red, orange, yellow, green, blue, purple |
+
+**Output columns:** `id`, `name`, `symbol_count`, `symbols` (comma-separated for table; array in JSON).
+
+**Note:** This skill does **not** expose write endpoints (`/append/`, `/replace/`). Modifying watchlists must be done through the TradingView UI.
+
+---
+
+### alerts
+
+Read-only access to `pricealerts.tradingview.com`. One command, multiple modes via `--type`.
+
+```bash
+opencli tradingview alerts --type list      # all alerts (active + paused)
+opencli tradingview alerts --type active    # currently armed
+opencli tradingview alerts --type triggered # recently fired
+opencli tradingview alerts --type offline   # fired while user was offline
+opencli tradingview alerts --type log       # full historical fire log
+```
+
+| Flag | Required | Default | Notes |
+|---|---|---|---|
+| `--type` | no | `list` | One of: `list`, `active`, `triggered`, `offline`, `log` |
+
+**Output columns:** `id`, `name`, `symbol`, `type`, `condition`, `value`, `active`, `status`, `fired_at`.
+
+**Tier sensitivity:** TradingView caps the number of saved alerts by tier (Free=1, Essential=10, Plus=20, Premium=400, Ultimate=unlimited). The API surface is identical; only the saved set changes.
+
+**Note:** Write endpoints (`/create_alert`, `/edit_alert`, `/remove_alert`, `/restart_alert`) are intentionally NOT exposed.
+
+---
+
 ## Limitations
 
 - **macOS only** — the `launch` helper relies on `open -a TradingView --args`. Linux / Windows desktop apps are not supported by this plugin.

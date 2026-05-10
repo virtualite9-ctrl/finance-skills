@@ -1,17 +1,22 @@
 ---
 name: tradingview-reader
 description: >
-  Read TradingView desktop app for market data using opencli (read-only).
-  Use this skill whenever the user wants spot quotes, options chains, options
-  expiries, chart state, or screenshots of charts open in their local
+  Read TradingView desktop app for market data, news, alerts, watchlists,
+  and screener results using opencli (read-only).
+  Use this skill whenever the user wants spot quotes, options chains,
+  options expiries, screener / movers / heatmap results, news headlines or
+  full stories, alerts list / fire log / offline fires, watchlists, symbol
+  search / autocomplete, chart state, or screenshots from their local
   TradingView.app. Triggers include: "options chain for X", "what's the IV
-  on Y", "show me SNDK puts", "what's the bid/ask on AAPL options",
-  "what symbol is on my TradingView chart", "screenshot my NVDA chart",
-  "TradingView quote for", "TV options for", "what expiries does X have",
-  "TradingView IV skew", any mention of TradingView in context of reading
-  market data, options data, or charts.
+  on Y", "show me SNDK puts", "TradingView screener for X sector",
+  "screen for stocks with RSI < 30", "TV gainers", "crypto by market cap",
+  "TradingView news on AAPL", "what news is breaking on $SPY",
+  "show my TradingView watchlists", "what's on my red flag list",
+  "list my TradingView alerts", "what alerts fired while I was away",
+  "search TradingView for nvidia", "what symbol is on my chart",
+  "screenshot my NVDA chart", "TradingView IV skew", "TV expiries for X".
   This skill is READ-ONLY — it does NOT place trades, modify watchlists,
-  or change chart layouts.
+  or change chart layouts. Write endpoints are not exposed.
 ---
 
 # TradingView Reader (Read-Only)
@@ -70,16 +75,53 @@ The `launch` step quits the running TradingView and reopens it with `--remote-de
 
 ## Step 2: Identify What the User Needs
 
+### Setup / chart inspection
+
 | User Request | Command | Key Flags |
 |---|---|---|
 | Setup / connection check | `opencli tradingview status` | — |
+| Relaunch app with CDP | `opencli tradingview launch` | `--port 9222` |
+| What's on the chart | `opencli tradingview chart-state` | `--tab <id>` |
+| Screenshot a chart | `opencli tradingview screenshot --output ~/charts/nvda.png` | `--tab <id>` |
+
+### Quotes + options
+
+| User Request | Command | Key Flags |
+|---|---|---|
 | Spot quote | `opencli tradingview quote --ticker X` | `--exchange NASDAQ` |
 | Options chain (full) | `opencli tradingview options-chain --ticker X` | `--exchange` |
 | Options chain (one expiry, ATM band) | `opencli tradingview options-chain --ticker X --expiry YYYY-MM-DD` | `--type call\|put`, `--strikes-around-spot N` |
 | List expiries | `opencli tradingview options-expiries --ticker X` | — |
-| What's on the chart | `opencli tradingview chart-state` | `--tab <id>` |
-| Screenshot a chart | `opencli tradingview screenshot --output ~/charts/nvda.png` | `--tab <id>` |
-| Relaunch app with CDP | `opencli tradingview launch` | `--port 9222` |
+
+### Screener
+
+| User Request | Command | Key Flags |
+|---|---|---|
+| Generic screener (stocks/crypto/forex/futures/bonds) | `opencli tradingview screener --market america --columns ...` | `--filter <json>`, `--sort field:desc`, `--limit N`, `--label-product` |
+| US stocks with RSI < 30, sorted by volume | `opencli tradingview screener --market america --columns "name,close,RSI\|60,volume" --filter '[{"left":"RSI\|60","operation":"less","right":30}]' --sort volume:desc` | — |
+| Top crypto by market cap | `opencli tradingview screener --market coin --columns "name,close,change,market_cap_calc" --sort market_cap_calc:desc --limit 50` | — |
+| Symbol search / autocomplete | `opencli tradingview search --query "nvidia"` | `--type stock\|funds\|crypto\|...`, `--exchange`, `--country` |
+
+### News
+
+| User Request | Command | Key Flags |
+|---|---|---|
+| Global news headlines | `opencli tradingview news --limit 25` | `--category`, `--area`, `--section`, `--provider` |
+| News for a specific ticker | `opencli tradingview news --symbol NASDAQ:AAPL` | `--limit`, `--section analysis\|press_release\|...` |
+| Full story by id | `opencli tradingview news --id <story-id>` | `--lang en` |
+
+### Watchlists + alerts
+
+| User Request | Command | Key Flags |
+|---|---|---|
+| List all watchlists | `opencli tradingview watchlists` | — |
+| Symbols in one watchlist | `opencli tradingview watchlists --id <wl-id>` | — |
+| Colored-flag list (red/orange/yellow/green/blue/purple) | `opencli tradingview watchlists --color red` | — |
+| List all alerts | `opencli tradingview alerts --type list` | — |
+| Active alerts | `opencli tradingview alerts --type active` | — |
+| Recently triggered alerts | `opencli tradingview alerts --type triggered` | — |
+| Alerts that fired while offline | `opencli tradingview alerts --type offline` | — |
+| Full alert log | `opencli tradingview alerts --type log` | — |
 
 ---
 
@@ -100,7 +142,12 @@ opencli tradingview quote --ticker SPY --exchange NYSEARCA -f json
 2. **Use `-f json`** for programmatic processing (LLM context, downstream skills).
 3. **Filter by expiry and `--strikes-around-spot`** — full chains can be 3,000+ rows; an unfiltered dump is rarely what the user wants.
 4. **Default `--exchange NASDAQ`** for US equities; require explicit `--exchange` for ETFs (e.g. SPY = NYSEARCA, QQQ = NASDAQ) or non-US listings.
-5. **NEVER call any write operation.** This skill is read-only — no trades, no watchlist edits, no chart writes.
+5. **For `screener`, `--columns` is critical** — it controls both the request and the output table. Include `name` and any field used in `--filter` or `--sort`. Append `|TF` for an indicator's timeframe, e.g. `RSI|60` for 1-hour RSI. The default columns are sensible for stocks but should be replaced for crypto / forex / futures (different field catalogs).
+6. **For `screener`, `--filter` is JSON** — array of `{left, operation, right}` clauses. Always single-quote the JSON in shell to avoid escaping issues. See `references/commands.md` for the operations cheat sheet.
+7. **For `news`, narrow the feed early** — the global feed is firehose-level. Use `--symbol`, `--category`, `--section`, or `--provider` before raising `--limit`.
+8. **For `search`, prefer it over guessing** — when the user gives an ambiguous ticker (e.g. "SPY" without exchange), run `search --query SPY` first to confirm the listing, then pass `--exchange` to subsequent commands.
+9. **For `watchlists` and `alerts`, default to summary** — a user asking "what's in my watchlists?" wants list names + counts, not every symbol.
+10. **NEVER call any write operation.** This skill is read-only — no trades, no watchlist edits, no alert creation/deletion, no chart writes. The plugin intentionally does not expose write endpoints (`/append`, `/replace`, `/create_alert`, etc.).
 
 ### Output format flag (`-f`)
 
@@ -117,6 +164,12 @@ opencli tradingview quote --ticker SPY --exchange NYSEARCA -f json
 - `quote` — `symbol`, `close`, `change`, `change_abs`, `currency`, `time`
 - `options-chain` — `expiry`, `dte`, `strike`, `type`, `bid`, `ask`, `mid`, `iv`, `delta`, `gamma`, `theta`, `vega`, `rho`, `theo`, `bid_iv`, `ask_iv`, `symbol`
 - `options-expiries` — `expiry`, `dte`, `contracts_count`
+- `screener` — dynamic; one column per `--columns` entry, plus `symbol`. (Default: `name`, `close`, `change`, `volume`, `market_cap_basic`, `sector.tr`.)
+- `search` — `symbol`, `description`, `type`, `exchange`, `country`, `currency`
+- `news` (list mode) — `id`, `published`, `provider`, `title`, `urgency`, `related_symbols`, `link`
+- `news` (story mode, `--id` set) — `id`, `published`, `provider`, `title`, `body`, `tags`, `link`
+- `watchlists` — `id`, `name`, `symbol_count`, `symbols`
+- `alerts` — `id`, `name`, `symbol`, `type`, `condition`, `value`, `active`, `status`, `fired_at`
 - `chart-state` — `layout_id`, `symbol`, `interval`, `url`
 - `screenshot` — `path`, `bytes`
 
@@ -124,12 +177,16 @@ opencli tradingview quote --ticker SPY --exchange NYSEARCA -f json
 
 ## Step 4: Present the Results
 
-1. **Lead with the structure summary** — for an options chain, state spot price, expiry being shown, ATM strike, and IV regime first; then the table.
-2. **Filter aggressively before showing** — never paste a 3,000-row chain. Default to ATM ± 6 strikes per expiry unless the user asks for the full chain.
+1. **Lead with the structure summary** — for an options chain, state spot price, expiry being shown, ATM strike, and IV regime first; then the table. For a screener, lead with the count of matches and the filters applied.
+2. **Filter aggressively before showing** — never paste a 3,000-row chain or a 500-row screener. Default to ATM ± 6 strikes per expiry for chains; for screeners cap to top 20 unless the user asks for more.
 3. **Highlight skew** — when showing both calls and puts, note IV skew direction if material.
 4. **For chart-state**, report layout id + symbol + interval + URL succinctly; offer to screenshot.
-5. **Treat sessions as private** — never expose CDP target IDs, cookies, or layout IDs unless the user asks.
-6. **Cross-reference with Funda when the user is making a trade decision** — TradingView's options data is convenient but can lag; for trade entry analysis, also fetch from the `funda-data` skill and reconcile.
+5. **For news (list mode)**, group by provider and lead with timestamps in the user's likely timezone (or always UTC ISO if uncertain). Include the link so the user can open the story. For story mode (`--id` set), the body is plain text — present it as-is, optionally trimmed.
+6. **For watchlists**, summarize counts before listing symbols (e.g. "3 watchlists: Earnings (24 syms), AI plays (12 syms), Hedges (8 syms)"). Don't dump 100-symbol watchlist contents unless asked.
+7. **For alerts**, group by status (active vs triggered/fired) and order recent firings by `fired_at` desc. Don't expose alert ids unless the user explicitly asks.
+8. **For screener results**, surface the top movers / extreme values in plain prose first (e.g. "highest market cap NVDA at $4.2T, 12 names below the RSI<30 threshold"), then the table.
+9. **Treat sessions as private** — never expose CDP target IDs, cookies, or layout IDs unless the user asks.
+10. **Cross-reference with Funda when the user is making a trade decision** — TradingView's options/screener data is convenient but can lag; for trade entry analysis, also fetch from the `funda-data` skill and reconcile.
 
 ---
 

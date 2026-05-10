@@ -175,11 +175,15 @@ export function summarizeExpiries(rows) {
  * Caller must pass an opencli IPage. Returns the parsed JSON body.
  *
  * @param {{evaluate: (s: string) => Promise<any>}} page
- * @param {'global/scan2'|'options/scan2'} endpoint
+ * @param {string} endpoint  e.g. 'global/scan2', 'options/scan2', 'america/scan2'
  * @param {object} body
+ * @param {object} [opts]
+ * @param {string} [opts.labelProduct]  default 'symbols-options' (used by /global/scan2 + /options/scan2).
+ *   Stocks screener uses 'screener-stock'; calendars use 'calendar-earnings' etc.
  */
-export async function scannerFetch(page, endpoint, body) {
-  const url = `${SCANNER_BASE}/${endpoint}?label-product=symbols-options`;
+export async function scannerFetch(page, endpoint, body, opts = {}) {
+  const labelProduct = opts.labelProduct ?? 'symbols-options';
+  const url = `${SCANNER_BASE}/${endpoint}?label-product=${encodeURIComponent(labelProduct)}`;
   const script = `
     (async () => {
       const res = await fetch(${JSON.stringify(url)}, {
@@ -194,6 +198,40 @@ export async function scannerFetch(page, endpoint, body) {
     })()
   `;
   return page.evaluate(script);
+}
+
+/**
+ * Build the request body for the generic screener endpoint.
+ *
+ * Supports the full scan2 grammar: filter clauses, filter2 boolean trees,
+ * sort, and column timeframe suffixes (e.g. "RSI|60" for 1h RSI).
+ *
+ * @param {object} opts
+ * @param {string} opts.market  market path segment ("america", "crypto", etc.)
+ * @param {string[]} opts.columns
+ * @param {Array<object>} [opts.filter]
+ * @param {object} [opts.filter2]  boolean composition tree
+ * @param {{sortBy: string, sortOrder?: 'asc'|'desc'}} [opts.sort]
+ * @param {number} [opts.limit]   max rows; clamped to [1, 500]
+ * @param {number} [opts.offset]
+ * @param {string[]} [opts.tickers]  optional explicit ticker list
+ */
+export function buildScreenerBody(opts) {
+  const limit = Math.min(Math.max(1, Number(opts.limit) || 50), 500);
+  const offset = Math.max(0, Number(opts.offset) || 0);
+  const body = {
+    markets: [String(opts.market).toLowerCase()],
+    symbols: opts.tickers && opts.tickers.length
+      ? { tickers: opts.tickers, query: { types: [] } }
+      : { query: { types: [] } },
+    options: { lang: 'en' },
+    columns: opts.columns,
+    range: [offset, offset + limit],
+  };
+  if (opts.filter) body.filter = opts.filter;
+  if (opts.filter2) body.filter2 = opts.filter2;
+  if (opts.sort) body.sort = { sortBy: opts.sort.sortBy, sortOrder: opts.sort.sortOrder ?? 'desc' };
+  return body;
 }
 
 export { CHAIN_FIELDS, QUOTE_FIELDS, SCANNER_BASE };
