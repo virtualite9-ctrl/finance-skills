@@ -1,23 +1,17 @@
 ---
 name: etf-premium
 description: >
-  Calculate ETF premium or discount relative to Net Asset Value (NAV) using Yahoo Finance data,
-  and decompose premium surges into fundamental vs structural drivers (gamma squeeze, dealer hedging,
-  AP arbitrage breakdowns).
-  Use this skill whenever the user asks about an ETF's premium or discount, NAV comparison,
-  whether an ETF is trading above or below its fair value, why an ETF spiked relative to its underlyings,
-  how much of a move is driven by options dealer hedging, or wants to compare market price vs NAV.
-  Triggers: "ETF premium", "ETF discount", "NAV premium", "is SPY trading at a premium",
-  "AGG premium to NAV", "market price vs NAV", "ETF mispricing", "BITO premium",
+  Calculate ETF premium/discount vs NAV via Yahoo Finance, and decompose single-day surges
+  into NAV-driven vs structural components (gamma squeeze, dealer hedging, blocked AP arbitrage).
+  Use whenever the user asks about an ETF's premium or discount, NAV comparison, why an ETF
+  diverged from its holdings, or how much of a move is dealer-hedging-driven.
+  Triggers: "ETF premium", "ETF discount", "NAV premium", "is SPY at a premium", "BITO premium",
   "IBIT premium", "bond ETF discount", "trading above/below NAV", "ETF premium screener",
-  "which ETFs have biggest discount", "compare ETF NAV", "ETF arbitrage",
-  "ETF gamma squeeze", "ETF premium surge", "decompose ETF move", "dealer gamma exposure",
-  "GEX for ETF", "why did this ETF jump", "is the ETF rally driven by hedging",
-  "premium convergence", "how long until the premium narrows", "AP arbitrage blocked",
-  or any request involving the gap between an ETF's market price and its underlying value.
-  Also triggers when analyzing leveraged, inverse, international, bond, commodity,
-  or crypto ETFs where premium/discount is a known concern, and when an ETF has just experienced
-  a dramatic single-day move that diverges from its underlying holdings.
+  "biggest discount", "compare ETF NAV", "ETF arbitrage", "ETF gamma squeeze",
+  "ETF premium surge", "decompose ETF move", "dealer gamma exposure", "GEX for ETF",
+  "why did this ETF jump", "premium convergence", "AP arbitrage blocked", or any request
+  about the gap between an ETF's price and underlying value. Especially relevant for
+  leveraged, inverse, international, bond, commodity, and crypto ETFs.
 ---
 
 # ETF Premium/Discount Analysis Skill
