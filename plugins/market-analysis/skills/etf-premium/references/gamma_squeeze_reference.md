@@ -230,3 +230,195 @@ Read this as: roughly half of the move was structural (gamma + AP impedance), an
 - **The dealer-share-of-volume figure is an upper bound.** It assumes every gamma-related share was hedged on the day; in practice hedging spreads over multiple sessions.
 - **Implied volatility from yfinance is the option's quoted IV, not a fitted volatility surface.** It's adequate for GEX estimation but not for precise pricing.
 - **This skill is descriptive, not predictive.** Quantifying that "35% of buying was dealer hedging today" does not tell you what tomorrow's flows will be.
+
+---
+
+## 7. Reference Python implementations
+
+Load these into the execution environment when running Sub-Skill E. All four functions assume `yfinance`, `pandas`, and `numpy` are importable (Sub-Skill E's Step 1 ensures this).
+
+### `decompose_etf_move` — E1
+
+```python
+import yfinance as yf
+import pandas as pd
+import numpy as np
+
+def decompose_etf_move(ticker_symbol, holdings_weights=None, window="2d"):
+    """
+    Decompose the most recent daily ETF move into NAV-driven vs excess premium.
+
+    holdings_weights: dict like {"MU": 0.20, "005930.KS": 0.22, ...}
+                      If None, attempts yfinance funds_data; falls back to user-supplied weights.
+    """
+    etf = yf.Ticker(ticker_symbol)
+    etf_hist = etf.history(period=window, auto_adjust=False)
+    if len(etf_hist) < 2:
+        return {"error": "Not enough history"}
+    etf_return_pct = (etf_hist["Close"].iloc[-1] / etf_hist["Close"].iloc[-2] - 1) * 100
+
+    if holdings_weights is None:
+        try:
+            top = etf.funds_data.top_holdings
+            holdings_weights = dict(zip(top.index, top["Holding Percent"]))
+        except Exception:
+            holdings_weights = {}
+
+    if not holdings_weights:
+        return {
+            "error": "Holdings weights unavailable — supply manually via holdings_weights={...}",
+            "etf_return_pct": round(etf_return_pct, 4),
+        }
+
+    weighted_return = 0.0
+    coverage = 0.0
+    holding_returns = {}
+    for sym, w in holdings_weights.items():
+        try:
+            h = yf.Ticker(sym).history(period=window, auto_adjust=False)
+            if len(h) >= 2:
+                r = (h["Close"].iloc[-1] / h["Close"].iloc[-2] - 1) * 100
+                holding_returns[sym] = round(r, 4)
+                weighted_return += w * r
+                coverage += w
+        except Exception:
+            pass
+
+    nav_return_proxy = weighted_return / coverage if coverage > 0 else None
+    excess = etf_return_pct - nav_return_proxy if nav_return_proxy is not None else None
+
+    return {
+        "ticker": ticker_symbol,
+        "etf_return_pct": round(etf_return_pct, 4),
+        "nav_return_proxy_pct": round(nav_return_proxy, 4) if nav_return_proxy else None,
+        "excess_premium_pct": round(excess, 4) if excess else None,
+        "holdings_coverage_pct": round(coverage * 100, 2),
+        "holding_returns": holding_returns,
+    }
+```
+
+### `compute_gex` — E2
+
+```python
+from datetime import datetime, timezone
+from math import log, sqrt, exp, pi
+
+def _norm_pdf(x):
+    return exp(-0.5 * x * x) / sqrt(2 * pi)
+
+def _bsm_gamma(S, K, T, r, sigma):
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        return 0.0
+    d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T))
+    return _norm_pdf(d1) / (S * sigma * sqrt(T))
+
+def compute_gex(ticker_symbol, risk_free_rate=0.045, max_expirations=8):
+    """Compute net (SqueezeMetrics) and gross dealer gamma exposure per 1% spot move."""
+    t = yf.Ticker(ticker_symbol)
+    info = t.info
+    spot = info.get("regularMarketPrice") or info.get("previousClose")
+    if not spot:
+        return {"error": "No spot price"}
+    expirations = t.options[:max_expirations]
+    if not expirations:
+        return {"error": "No options chain"}
+
+    now = datetime.now(timezone.utc)
+    rows = []
+    for exp_str in expirations:
+        try:
+            chain = t.option_chain(exp_str)
+        except Exception:
+            continue
+        exp_date = datetime.strptime(exp_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        T = max((exp_date - now).total_seconds() / (365.25 * 86400), 1e-6)
+        for side, df in [("call", chain.calls), ("put", chain.puts)]:
+            for _, row in df.iterrows():
+                K = row.get("strike")
+                iv = row.get("impliedVolatility")
+                oi = row.get("openInterest", 0) or 0
+                if not K or not iv or oi <= 0:
+                    continue
+                gamma = _bsm_gamma(spot, K, T, risk_free_rate, iv)
+                rows.append({
+                    "expiration": exp_str, "side": side, "strike": K,
+                    "iv": iv, "oi": oi, "gamma": gamma,
+                    "gamma_$_per_1pct": oi * gamma * spot * spot,
+                })
+
+    if not rows:
+        return {"error": "No usable contracts"}
+
+    df = pd.DataFrame(rows)
+    call_gex = df[df["side"] == "call"]["gamma_$_per_1pct"].sum()
+    put_gex = df[df["side"] == "put"]["gamma_$_per_1pct"].sum()
+
+    top = (df.groupby(["expiration", "strike", "side"])["gamma_$_per_1pct"]
+             .sum().sort_values(ascending=False).head(10).reset_index())
+
+    call_oi = df[df["side"] == "call"]["oi"].sum()
+    put_oi = df[df["side"] == "put"]["oi"].sum()
+    cp_ratio = call_oi / put_oi if put_oi > 0 else None
+
+    df["moneyness"] = abs(df["strike"] / spot - 1)
+    near_atm = df.sort_values("moneyness").head(20)
+    atm_iv_pct = near_atm["iv"].median() * 100 if len(near_atm) else None
+
+    return {
+        "ticker": ticker_symbol, "spot": spot,
+        "call_gex_per_1pct_$": call_gex, "put_gex_per_1pct_$": put_gex,
+        "net_gex_squeezemetrics_$": call_gex - put_gex,
+        "gross_hedge_pressure_$": call_gex + put_gex,
+        "total_call_oi": int(call_oi), "total_put_oi": int(put_oi),
+        "call_put_oi_ratio": round(cp_ratio, 2) if cp_ratio else None,
+        "atm_iv_pct": round(atm_iv_pct, 2) if atm_iv_pct else None,
+        "expirations_analyzed": len(expirations),
+        "top_concentrations": top,
+    }
+```
+
+### `estimate_dealer_share_of_volume` — E3
+
+```python
+def estimate_dealer_share_of_volume(ticker_symbol, gex_per_1pct_dollars, etf_return_pct):
+    """Implied dealer-driven $ buying = |GEX| * |return%|; compare to actual $ volume."""
+    hist = yf.Ticker(ticker_symbol).history(period="2d", auto_adjust=False)
+    if hist.empty:
+        return None
+    today = hist.iloc[-1]
+    actual_dollar_volume = today["Close"] * today["Volume"]
+    implied = abs(gex_per_1pct_dollars) * abs(etf_return_pct)
+    share = implied / actual_dollar_volume if actual_dollar_volume > 0 else None
+    return {
+        "actual_dollar_volume_$": round(actual_dollar_volume, 0),
+        "implied_dealer_buying_$": round(implied, 0),
+        "dealer_share_of_volume_pct": round(share * 100, 2) if share else None,
+    }
+```
+
+### `assess_convergence` — E4
+
+```python
+def assess_convergence(ticker_symbol, top_concentrations_df):
+    """Qualitative convergence signals across hours/days/weeks horizons."""
+    info = yf.Ticker(ticker_symbol).info
+
+    is_us = "us_market" in (info.get("market") or "").lower()
+    ap_note = (
+        "US-listed underlying — AP arbitrage active during US hours"
+        if is_us
+        else "International — AP arbitrage may be blocked while underlying market is closed"
+    )
+
+    if not top_concentrations_df.empty:
+        next_exp = top_concentrations_df.iloc[0]["expiration"]
+        days_to_exp = (datetime.strptime(next_exp, "%Y-%m-%d") - datetime.now()).days
+        exp_note = f"Largest gamma concentration expires in {days_to_exp} days ({next_exp})"
+    else:
+        exp_note = "No clear strike concentration"
+
+    aum = info.get("totalAssets")
+    aum_note = f"Total AUM: ${aum/1e9:.2f}B" if aum else "AUM unavailable"
+
+    return {"ap_arbitrage": ap_note, "options_window": exp_note, "flows": aum_note}
+```

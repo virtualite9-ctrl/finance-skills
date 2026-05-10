@@ -74,20 +74,14 @@ Classify the user's request and jump to the matching section. If the user asks a
 ```python
 import yfinance as yf
 
-# Peer groups by category — used to automatically compare the target ETF against its closest peers
+# Peer groups by Morningstar category. Full table in references/etf_premium_reference.md ("Tier 3: Peer Comparison Groups"); reproduce inline for self-contained execution.
 CATEGORY_PEERS = {
-    "Digital Assets": ["IBIT", "BITO", "FBTC", "ETHA", "ARKB", "GBTC"],
-    "Intermediate Core Bond": ["AGG", "BND", "SCHZ"],
-    "High Yield Bond": ["HYG", "JNK", "USHY"],
-    "Long Government": ["TLT", "VGLT", "SPTL"],
-    "Emerging Markets Bond": ["EMB", "VWOB", "PCY"],
-    "Large Growth": ["QQQ", "VUG", "IWF", "SCHG"],
-    "Large Blend": ["SPY", "VOO", "IVV", "VTI"],
-    "Commodities Focused": ["GLD", "IAU", "SLV", "DBC"],
-    "China Region": ["KWEB", "FXI", "MCHI"],
-    "Trading--Leveraged Equity": ["TQQQ", "UPRO", "SOXL", "JNUG"],
-    "Trading--Inverse Equity": ["SQQQ", "SPXU", "SOXS", "JDST"],
-    "Derivative Income": ["JEPI", "JEPQ", "QYLD"],
+    "Digital Assets": ["IBIT", "BITO", "FBTC", "ETHA", "ARKB", "GBTC"], "Intermediate Core Bond": ["AGG", "BND", "SCHZ"],
+    "High Yield Bond": ["HYG", "JNK", "USHY"], "Long Government": ["TLT", "VGLT", "SPTL"],
+    "Emerging Markets Bond": ["EMB", "VWOB", "PCY"], "Large Growth": ["QQQ", "VUG", "IWF", "SCHG"],
+    "Large Blend": ["SPY", "VOO", "IVV", "VTI"], "Commodities Focused": ["GLD", "IAU", "SLV", "DBC"],
+    "China Region": ["KWEB", "FXI", "MCHI"], "Trading--Leveraged Equity": ["TQQQ", "UPRO", "SOXL", "JNUG"],
+    "Trading--Inverse Equity": ["SQQQ", "SPXU", "SOXS", "JDST"], "Derivative Income": ["JEPI", "JEPQ", "QYLD"],
     "Large Value": ["SCHD", "VYM", "DVY", "HDV"],
 }
 
@@ -273,8 +267,7 @@ DEFAULT_ETF_UNIVERSE = {
     "Crypto": ["IBIT", "BITO", "FBTC", "ETHA", "ARKB", "GBTC"],
     "Leveraged/Inverse": ["TQQQ", "SQQQ", "SPXU", "UPRO", "JNUG", "JDST", "SOXL", "SOXS"],
     "Sector": ["XLF", "XLE", "XLK", "XLV", "XLI", "XLP", "XLU", "XLRE", "XLC", "XLB", "XLY"],
-    "Sector - Semis/Tech": ["SOXX", "SMH", "IGV", "XSD"],
-    "Sector - Healthcare": ["XBI", "IBB", "IHI"],
+    "Sector - Semis/Tech": ["SOXX", "SMH", "IGV", "XSD"], "Sector - Healthcare": ["XBI", "IBB", "IHI"],
     "Thematic": ["ARKW", "ARKG", "HACK", "CLOU", "WCLD", "BUG", "BOTZ", "LIT", "ICLN", "TAN"],
     "Income": ["JEPI", "JEPQ", "SCHD", "VYM", "DVY", "DIVO", "HDV", "QYLD"],
 }
@@ -402,337 +395,71 @@ def premium_deep_dive(ticker_symbol):
 
 ### D2: Explain the *why*
 
-After gathering data, explain the premium/discount using this diagnostic framework:
+After gathering data, attribute the premium/discount using `references/etf_premium_reference.md` ("Why the Mechanism Can Fail" table) which maps causes (closed underlying market, illiquid basket, stress, regulatory limits, futures contango, daily leverage reset, retail demand surge) to ETF types affected.
 
-**Common causes of premiums:**
-- **Demand surge** — more buyers than authorized participants can create shares (common for new/hot ETFs like crypto)
-- **Time-zone mismatch** — international ETF trading when underlying markets are closed; price reflects anticipated moves
-- **Creation mechanism bottleneck** — when authorized participants face constraints on creating new shares
-- **Sentiment premium** — retail demand pushes price above fair value during hype cycles
-
-**Common causes of discounts:**
-- **Liquidity stress** — during sell-offs, bond and credit ETFs often trade at discounts because underlying bonds are harder to price/trade than the ETF itself
-- **Redemption pressure** — heavy outflows but slow authorized participant response
-- **Stale NAV** — the official NAV may not reflect after-hours news or events
-- **Structural issues** — contango in futures-based ETFs (USO, UNG) creates persistent drag
-
-**Is the premium likely to persist?**
-- For liquid US equity ETFs: No — arbitrage corrects deviations within minutes
-- For bond ETFs during stress: Discounts can persist for days or weeks
-- For crypto ETFs: Premiums tend to narrow as the fund matures and APs become more active
-- For international ETFs: Resets daily as underlying markets open
+**Persistence rules of thumb**: liquid US equity → minutes (arbitrage corrects); bond ETFs in stress → days or weeks; crypto → narrows as APs mature; international → resets when home market opens.
 
 ---
 
 ## Sub-Skill E: Premium Surge Decomposition (Gamma Squeeze Analysis)
 
-**Goal**: When an ETF has just experienced a dramatic intraday move that diverges from its underlying holdings, decompose the move into (1) a fundamental NAV-driven component and (2) an "excess premium" driven by structural forces — most commonly options dealer gamma hedging, AP arbitrage breakdowns, or sentiment surges. Then assess how long the premium will likely take to converge.
+**Goal**: When an ETF moves much more than its underlying basket in a single session, decompose the move into (1) a NAV-driven component and (2) an "excess premium" driven by structural forces — usually options dealer gamma hedging, blocked AP arbitrage, or sentiment. Then assess how long the premium will take to converge.
 
-This sub-skill is appropriate when the user reports or asks about:
-- An ETF moving 5%+ in a single session
-- A divergence between the ETF and its named underlyings (e.g., "MSTR jumped 13% but BTC only rose 3%")
-- A suspected gamma squeeze in an ETF or single name
-- Whether dealer hedging is amplifying a move
+**When to use**: User reports an ETF moving 5%+ in a session, asks why an ETF diverged from its named underlyings, suspects a gamma squeeze, or asks whether dealer hedging amplified a move.
 
-Read `references/gamma_squeeze_reference.md` for the full GEX formula derivation, dealer-positioning conventions, and worked examples before running E2.
+**Read first**: `references/gamma_squeeze_reference.md` covers the full GEX formula derivation, dealer-positioning conventions, the convergence framework, a worked example, and the **reference Python implementations of all four functions used below** (`decompose_etf_move`, `compute_gex`, `estimate_dealer_share_of_volume`, `assess_convergence`). Load the code from there before running E1–E4.
 
 ### E1: Decompose today's move into NAV-driven vs excess premium
 
-The static `navPrice` field gives only the most recent end-of-day NAV — it cannot tell you how much of *today's* move is NAV-driven. Estimate the NAV return from the holdings' returns instead:
+The static `navPrice` only reflects the most recent end-of-day NAV. To attribute *today's* move, estimate NAV return from the holdings' returns: `NAV_return ≈ Σ (weight_i × return_i) / Σ weight_i`.
 
-```python
-import yfinance as yf
-import pandas as pd
-import numpy as np
+Run `decompose_etf_move(ticker, holdings_weights=None)` from the reference. It auto-fetches holdings via `yfinance.funds_data` when available; user-supplied weights work for ETFs where it isn't (most international funds). Output: `etf_return_pct`, `nav_return_proxy_pct`, `excess_premium_pct`.
 
-def decompose_etf_move(ticker_symbol, holdings_weights=None, window="2d"):
-    """
-    Decompose the ETF's most recent daily move into NAV-driven vs excess premium.
-
-    holdings_weights: dict like {"MU": 0.20, "005930.KS": 0.22, "000660.KS": 0.27, ...}
-                      If None, attempts to fetch via yfinance's funds_data;
-                      falls back to user-supplied weights for ETFs where it isn't available.
-    """
-    etf = yf.Ticker(ticker_symbol)
-    info = etf.info
-
-    # ETF return over the most recent session
-    etf_hist = etf.history(period=window, auto_adjust=False)
-    if len(etf_hist) < 2:
-        return {"error": "Not enough history"}
-    etf_close_today = etf_hist["Close"].iloc[-1]
-    etf_close_prev = etf_hist["Close"].iloc[-2]
-    etf_return_pct = (etf_close_today / etf_close_prev - 1) * 100
-
-    # Try to auto-fetch holdings if not supplied
-    if holdings_weights is None:
-        try:
-            top_holdings = etf.funds_data.top_holdings  # DataFrame
-            holdings_weights = dict(zip(top_holdings.index, top_holdings["Holding Percent"]))
-        except Exception:
-            holdings_weights = {}
-
-    if not holdings_weights:
-        return {
-            "error": "Holdings weights unavailable — supply manually via holdings_weights={'TICKER': weight, ...}",
-            "etf_return_pct": round(etf_return_pct, 4),
-        }
-
-    # Weighted return of underlying holdings (proxy for NAV move)
-    weighted_return = 0.0
-    coverage = 0.0
-    holding_returns = {}
-    for sym, w in holdings_weights.items():
-        try:
-            h = yf.Ticker(sym).history(period=window, auto_adjust=False)
-            if len(h) >= 2:
-                r = (h["Close"].iloc[-1] / h["Close"].iloc[-2] - 1) * 100
-                holding_returns[sym] = round(r, 4)
-                weighted_return += w * r
-                coverage += w
-        except Exception:
-            pass
-
-    # Normalize to coverage so partial holdings still give a sensible NAV proxy
-    nav_return_proxy = weighted_return / coverage if coverage > 0 else None
-    excess_premium_pct = (
-        etf_return_pct - nav_return_proxy if nav_return_proxy is not None else None
-    )
-
-    return {
-        "ticker": ticker_symbol,
-        "etf_return_pct": round(etf_return_pct, 4),
-        "nav_return_proxy_pct": round(nav_return_proxy, 4) if nav_return_proxy else None,
-        "excess_premium_pct": round(excess_premium_pct, 4) if excess_premium_pct else None,
-        "holdings_coverage_pct": round(coverage * 100, 2),
-        "holding_returns": holding_returns,
-        "interpretation": (
-            "Most of the move is NAV-driven — limited structural component"
-            if excess_premium_pct is not None and abs(excess_premium_pct) < 1
-            else "Significant excess premium — investigate dealer hedging, AP bottlenecks, or sentiment"
-            if excess_premium_pct is not None
-            else "Cannot conclude without holdings data"
-        ),
-    }
-```
-
-**Caveat**: For international ETFs whose underlyings trade in a closed session (e.g., Asian holdings during US hours), the holdings' US-listed proxies (ADRs) or futures must be used. If neither is available, flag this to the user — the NAV proxy will be stale.
+**Caveat**: For ETFs with foreign holdings during a closed session (e.g., Asian holdings during US hours), substitute ADRs or futures for the underlying prices, or flag the proxy as stale.
 
 ### E2: Compute dealer gamma exposure (GEX) from the options chain
 
-GEX quantifies how much hedging buying/selling dealers must do per 1% move in the underlying. Large positive GEX accumulating on the call side during a rally indicates a gamma squeeze in progress.
+GEX measures how much hedging dealers must do per 1% move in the underlying. Run `compute_gex(ticker, risk_free_rate=0.045)` from the reference. It returns:
 
-```python
-import numpy as np
-from datetime import datetime, timezone
-from math import log, sqrt, exp, pi
+- `net_gex_squeezemetrics_$` per 1% — signed; negative = destabilizing (dealers buy rallies)
+- `gross_hedge_pressure_$` — upper-bound under the customer-net-long convention
+- `call_put_oi_ratio`, `atm_iv_pct`, and a top-10 concentration table by strike/expiration
 
-def _norm_pdf(x):
-    return exp(-0.5 * x * x) / sqrt(2 * pi)
+Interpret:
 
-def _bsm_gamma(S, K, T, r, sigma):
-    """Black-Scholes gamma. Returns 0 for degenerate inputs."""
-    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
-        return 0.0
-    d1 = (log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrt(T))
-    return _norm_pdf(d1) / (S * sigma * sqrt(T))
+- **Net GEX strongly negative** → dealers short gamma; rallies amplified. Classic squeeze fuel.
+- **Concentration on a single near-dated strike** → squeeze is fragile and has a fuse at that expiration.
+- **ATM IV well above category baseline** → time decay alone will provide some convergence pressure over days.
+- **Call/Put OI ratio > 2.5** → call-heavy positioning consistent with a bullish squeeze.
 
-def compute_gex(ticker_symbol, risk_free_rate=0.045, max_expirations=8):
-    """
-    Compute gross and net dealer gamma exposure.
+### E3: Compare dealer hedging to actual volume
 
-    Conventions:
-      - Per contract, dollar gamma per 1% move = OI * 100 * gamma * spot * (spot * 0.01)
-                                                = OI * gamma * spot^2  (with multiplier=100)
-      - SqueezeMetrics convention (assumes dealers SHORT calls, LONG puts):
-            net_gex = call_gamma_$ - put_gamma_$
-        Positive net_gex = stabilizing (dealers sell rallies, buy dips)
-        Negative net_gex = destabilizing (dealers buy rallies, sell dips → squeeze)
-      - "Customer-net-long-everything" convention (dealers SHORT both):
-            gross_hedge = call_gamma_$ + put_gamma_$
-        This is the maximum hedging pressure assumption.
-    """
-    t = yf.Ticker(ticker_symbol)
-    info = t.info
-    spot = info.get("regularMarketPrice") or info.get("previousClose")
-    if not spot:
-        return {"error": "No spot price"}
+Run `estimate_dealer_share_of_volume(ticker, gex_per_1pct_dollars, etf_return_pct)` from the reference. The implied dealer $ buying for the day is `|GEX| × |return%|`; comparing it to actual dollar volume gives the dealer share of buying pressure.
 
-    expirations = t.options[:max_expirations]
-    if not expirations:
-        return {"error": "No options chain available"}
-
-    now = datetime.now(timezone.utc)
-    rows = []
-    for exp_str in expirations:
-        try:
-            chain = t.option_chain(exp_str)
-        except Exception:
-            continue
-        exp_date = datetime.strptime(exp_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        T = max((exp_date - now).total_seconds() / (365.25 * 86400), 1e-6)
-
-        for side, df in [("call", chain.calls), ("put", chain.puts)]:
-            for _, row in df.iterrows():
-                K = row.get("strike")
-                iv = row.get("impliedVolatility")
-                oi = row.get("openInterest", 0) or 0
-                if not K or not iv or oi <= 0:
-                    continue
-                gamma = _bsm_gamma(spot, K, T, risk_free_rate, iv)
-                # Dollar value per 1% spot move:
-                gamma_dollars_per_1pct = oi * gamma * spot * spot
-                rows.append({
-                    "expiration": exp_str,
-                    "side": side,
-                    "strike": K,
-                    "iv": iv,
-                    "oi": oi,
-                    "gamma": gamma,
-                    "gamma_$_per_1pct": gamma_dollars_per_1pct,
-                })
-
-    if not rows:
-        return {"error": "No usable contracts"}
-
-    df = pd.DataFrame(rows)
-    call_gex = df[df["side"] == "call"]["gamma_$_per_1pct"].sum()
-    put_gex = df[df["side"] == "put"]["gamma_$_per_1pct"].sum()
-
-    # Top concentration: which expiration & strike dominate
-    top_strikes = (
-        df.groupby(["expiration", "strike", "side"])["gamma_$_per_1pct"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-        .reset_index()
-    )
-
-    total_call_oi = df[df["side"] == "call"]["oi"].sum()
-    total_put_oi = df[df["side"] == "put"]["oi"].sum()
-    cp_ratio = total_call_oi / total_put_oi if total_put_oi > 0 else None
-
-    # Pull near-term ATM IV as a single representative number
-    df["moneyness"] = abs(df["strike"] / spot - 1)
-    near_atm = df.sort_values("moneyness").head(20)
-    atm_iv_pct = near_atm["iv"].median() * 100 if len(near_atm) else None
-
-    return {
-        "ticker": ticker_symbol,
-        "spot": spot,
-        "call_gex_per_1pct_$": call_gex,
-        "put_gex_per_1pct_$": put_gex,
-        "net_gex_squeezemetrics_$": call_gex - put_gex,
-        "gross_hedge_pressure_$": call_gex + put_gex,
-        "total_call_oi": int(total_call_oi),
-        "total_put_oi": int(total_put_oi),
-        "call_put_oi_ratio": round(cp_ratio, 2) if cp_ratio else None,
-        "atm_iv_pct": round(atm_iv_pct, 2) if atm_iv_pct else None,
-        "expirations_analyzed": len(expirations),
-        "top_concentrations": top_strikes,
-    }
-```
-
-Interpret the output:
-
-- **`net_gex_squeezemetrics_$` highly negative** → dealers are short gamma; rallies will be amplified by their hedging buys. Classic gamma-squeeze fuel.
-- **Concentration on a single near-dated strike** (e.g., the article's "June $45 calls") → squeeze is fragile and concentrated. When that strike expires or the spot moves past it, the gamma decays sharply.
-- **ATM IV well above the recent average** (article example: 78 vs typical ~30–40) → market is pricing in continued large moves; option premium decay alone will provide some convergence pressure over days.
-- **Call/Put OI ratio > 2.5** → call-heavy positioning, consistent with a bullish gamma squeeze setup.
-
-### E3: Compare structural buying pressure to actual volume
-
-The article's most concrete claim was that ~35% of the day's buying was dealer-driven. Reproduce this comparison:
-
-```python
-def estimate_dealer_share_of_volume(ticker_symbol, gex_per_1pct_dollars, etf_return_pct):
-    """
-    Implied dealer-driven $ buying = |gex_per_1pct| * |etf_return_pct|
-    Compare to actual dollar volume.
-    """
-    t = yf.Ticker(ticker_symbol)
-    hist = t.history(period="2d", auto_adjust=False)
-    if hist.empty:
-        return None
-    today = hist.iloc[-1]
-    actual_dollar_volume = today["Close"] * today["Volume"]
-
-    implied_dealer_buying = abs(gex_per_1pct_dollars) * abs(etf_return_pct)
-    share = implied_dealer_buying / actual_dollar_volume if actual_dollar_volume > 0 else None
-
-    return {
-        "actual_dollar_volume_$": round(actual_dollar_volume, 0),
-        "implied_dealer_buying_$": round(implied_dealer_buying, 0),
-        "dealer_share_of_volume_pct": round(share * 100, 2) if share else None,
-    }
-```
-
-This is a rough estimate — it assumes every contract's full gamma was hedged in a single direction during the move. Real hedging is incremental, and not all dealers hedge identically. Treat as an upper-bound heuristic, not a precise figure. Always present it alongside the assumptions.
+This is an upper bound — it assumes uniform dealer positioning and that all gamma was hedged in a single session. Treat as a heuristic and always state the assumptions.
 
 ### E4: Assess premium convergence timeline
 
-The article's three-tier convergence framework:
+Three time horizons, different mechanisms:
 
 | Time scale | Mechanism | What to check |
 |---|---|---|
-| **Hours** | AP creation/redemption arbitrage | Is the underlying market open? Are creation units restricted? Is the spread between bid/ask widening (suggests AP stepping back)? |
-| **Days** | Options expiration / gamma decay | When does the dominant strike's expiration land? Is OI rolling forward or being closed? Is IV starting to compress? |
-| **Weeks** | Net flow normalization | Is the ETF receiving large daily inflows (signals demand outpacing creation capacity)? Is short interest building (potential additional squeeze fuel)? |
+| **Hours** | AP creation/redemption arbitrage | Is the underlying market open? Is bid/ask widening (AP stepping back)? Are creation units capped? |
+| **Days** | Options expiration / gamma decay | When does the dominant strike expire? Is OI rolling forward or closing? Is IV compressing? |
+| **Weeks** | Net flow normalization | AUM change — is demand still exceeding creation capacity? Is short interest building? |
 
-```python
-def assess_convergence(ticker_symbol, top_concentrations_df):
-    """Returns a dict of qualitative convergence signals."""
-    t = yf.Ticker(ticker_symbol)
-    info = t.info
-
-    # 1. AP arbitrage: market hours of underlying
-    region = info.get("region") or info.get("market") or "unknown"
-    underlying_session_note = (
-        "International — check whether underlying market overlaps US trading hours; "
-        "AP arbitrage may be blocked when underlying market is closed"
-        if "us_market" not in (info.get("market") or "").lower()
-        else "US-listed underlying — AP arbitrage active during US hours"
-    )
-
-    # 2. Options expiration: nearest concentrated strike
-    if not top_concentrations_df.empty:
-        next_major_exp = top_concentrations_df.iloc[0]["expiration"]
-        days_to_exp = (datetime.strptime(next_major_exp, "%Y-%m-%d") - datetime.now()).days
-        exp_note = f"Largest gamma concentration expires in {days_to_exp} days ({next_major_exp})"
-    else:
-        exp_note = "No clear strike concentration"
-
-    # 3. Flow proxy: AUM trajectory (very rough)
-    aum = info.get("totalAssets")
-    aum_note = f"Total AUM: ${aum/1e9:.2f}B" if aum else "AUM unavailable"
-
-    return {
-        "ap_arbitrage": underlying_session_note,
-        "options_window": exp_note,
-        "flows": aum_note,
-    }
-```
+Run `assess_convergence(ticker, top_concentrations_df)` from the reference for a structured summary that reads each mechanism's current state.
 
 ### E5: Present the decomposition
 
-Format the answer in this order:
+Order the output:
 
-1. **Headline number**: today's ETF move, NAV-proxy move, and the excess premium (in pp).
-2. **Decomposition table**:
-
-   | Component | Contribution |
-   |---|---|
-   | NAV-driven (holdings × weights) | +X.X% |
-   | Excess premium (residual) | +Y.Y% |
-   | Total ETF move | +Z.Z% |
-
-3. **Dealer hedging quantification**:
-   - Net GEX (SqueezeMetrics convention)
-   - Implied dealer $ buying for the day vs actual $ volume
-   - Estimated dealer share of buying pressure
+1. **Headline**: today's ETF move, NAV-proxy move, excess premium (pp).
+2. **Decomposition table**: NAV-driven / excess premium / total.
+3. **Dealer hedging**: net GEX, implied dealer $ buying vs actual $ volume, dealer share of buying pressure.
 4. **Risk indicators**: ATM IV, call/put OI ratio, top-3 strike/expiration concentrations.
-5. **Convergence outlook**: list each of the hours/days/weeks mechanisms with the current state of each.
-6. **Caveats**: the GEX estimate assumes uniform dealer positioning; the NAV proxy is stale during overnight sessions; this is *not* a forecast of future price.
+5. **Convergence outlook**: hours / days / weeks, each with current state.
+6. **Caveats**: GEX assumes uniform dealer positioning; NAV proxy is stale when underlying market is closed; this is descriptive, not a price forecast.
 
 ---
 
