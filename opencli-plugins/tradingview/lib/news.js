@@ -6,6 +6,8 @@
  *   GET /v2/story?id=… — full story (returns AST in `astDescription`)
  */
 
+import { tradingViewFetch } from './cookies.js';
+
 const NEWS_BASE = 'https://news-headlines.tradingview.com/v2';
 
 /**
@@ -117,6 +119,33 @@ export function epochToIso(value) {
   // Heuristic: > 1e12 = milliseconds, otherwise seconds.
   const ms = n > 1e12 ? n : n * 1000;
   return new Date(ms).toISOString();
+}
+
+/**
+ * Fetch the headlines feed.
+ * @param {Parameters<typeof buildHeadlinesUrl>[0]} opts
+ */
+export async function fetchHeadlines(opts) {
+  const url = buildHeadlinesUrl(opts);
+  const res = await tradingViewFetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`news headlines ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch a single story.
+ */
+export async function fetchStory(storyId, lang = 'en') {
+  const url = buildStoryUrl(storyId, lang);
+  const res = await tradingViewFetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`news story ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json();
 }
 
 export { NEWS_BASE };

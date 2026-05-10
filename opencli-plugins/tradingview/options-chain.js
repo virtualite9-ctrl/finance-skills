@@ -21,9 +21,8 @@ cli({
   site: 'tradingview',
   name: 'options-chain',
   description: 'Options chain (full or ATM-band slice) with greeks, IV, and theoretical price',
-  domain: 'www.tradingview.com',
-  strategy: Strategy.UI,
-  browser: true,
+  strategy: Strategy.PUBLIC,
+  browser: false,
   args: [
     { name: 'ticker', required: true, help: 'Underlying ticker (e.g. SNDK)' },
     { name: 'exchange', default: 'NASDAQ', help: 'TradingView exchange code' },
@@ -35,21 +34,28 @@ cli({
       default: DEFAULT_HALF_BAND,
       help: `Half-band; total strikes = 2N+1. 0 = full strike list. (default ${DEFAULT_HALF_BAND})`,
     },
+    {
+      name: 'include-expired',
+      type: 'boolean',
+      default: false,
+      help: 'Include expired contracts (DTE < 0). Default: false',
+    },
   ],
   columns: [
     'expiry', 'dte', 'strike', 'type', 'bid', 'ask', 'mid', 'iv',
     'delta', 'gamma', 'theta', 'vega', 'rho', 'theo', 'bid_iv', 'ask_iv', 'symbol',
   ],
-  func: async (page, args) => {
+  func: async (_page, args) => {
     const ticker = String(args.ticker).toUpperCase().trim();
     const exchange = String(args.exchange).toUpperCase().trim();
     const wantExpiry = args.expiry ? String(args.expiry) : null;
     const wantType = args.type ? String(args.type).toLowerCase() : null;
     const halfBand = Number(args['strikes-around-spot'] ?? DEFAULT_HALF_BAND);
+    const includeExpired = Boolean(args['include-expired']);
 
     const [chainPayload, quotePayload] = await Promise.all([
-      scannerFetch(page, 'options/scan2', buildChainBody(exchange, ticker)),
-      scannerFetch(page, 'global/scan2', buildQuoteBody(exchange, ticker)),
+      scannerFetch('options/scan2', buildChainBody(exchange, ticker)),
+      scannerFetch('global/scan2', buildQuoteBody(exchange, ticker)),
     ]);
 
     let rows = decodeScannerRows(chainPayload).map((r) => normalizeChainRow(r));
@@ -60,6 +66,7 @@ cli({
       );
     }
 
+    if (!includeExpired) rows = rows.filter((r) => r.dte >= 0);
     if (wantExpiry) rows = rows.filter((r) => r.expiry === wantExpiry);
     if (wantType) rows = rows.filter((r) => r.type === wantType);
 

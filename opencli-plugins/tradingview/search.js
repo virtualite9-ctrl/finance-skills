@@ -2,17 +2,15 @@
  * tradingview search — symbol/instrument autocomplete via symbol-search.tradingview.com.
  *
  *   GET https://symbol-search.tradingview.com/symbol_search/v3/?text=<q>&...
- *
- * Useful before any other command when the user's ticker is ambiguous (e.g.
- * SPY → NYSEARCA:SPY vs other listings).
  */
 
 import { cli, Strategy } from '@jackwener/opencli/registry';
+import { tradingViewFetch } from './lib/cookies.js';
 
 const SEARCH_BASE = 'https://symbol-search.tradingview.com/symbol_search/v3/';
 
 const VALID_TYPES = [
-  '', 'stock', 'funds', 'index', 'futures', 'forex', 'crypto', 'bond', 'economic',
+  'stock', 'funds', 'index', 'futures', 'forex', 'crypto', 'bond', 'economic',
   'dr', 'cfd', 'option', 'structured',
 ];
 
@@ -20,14 +18,13 @@ cli({
   site: 'tradingview',
   name: 'search',
   description: 'Symbol search / autocomplete (returns ticker, exchange, type, country, description)',
-  domain: 'www.tradingview.com',
-  strategy: Strategy.UI,
-  browser: true,
+  strategy: Strategy.PUBLIC,
+  browser: false,
   args: [
     { name: 'query', required: true, help: 'Search text (e.g. "AAPL", "apple", "BINANCE:BTC")' },
     {
       name: 'type',
-      choices: VALID_TYPES.filter((t) => t !== ''),
+      choices: VALID_TYPES,
       help: 'Filter to one asset type. Omit for all.',
     },
     { name: 'exchange', help: 'Filter to one exchange (NASDAQ, NYSE, BINANCE, OANDA, ...)' },
@@ -37,7 +34,7 @@ cli({
     { name: 'offset', type: 'int', default: 0, help: 'Pagination start' },
   ],
   columns: ['symbol', 'description', 'type', 'exchange', 'country', 'currency'],
-  func: async (page, args) => {
+  func: async (_page, args) => {
     const params = new URLSearchParams();
     params.set('text', String(args.query));
     params.set('hl', '1');
@@ -51,8 +48,12 @@ cli({
       params.set('sort_by_country', String(args.country));
     }
 
-    const url = `${SEARCH_BASE}?${params.toString()}`;
-    const payload = await getJson(page, url);
+    const res = await tradingViewFetch(`${SEARCH_BASE}?${params.toString()}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`search ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const payload = await res.json();
     const symbols = Array.isArray(payload?.symbols) ? payload.symbols : [];
     const limit = Math.max(1, Number(args.limit) || 20);
     return symbols.slice(0, limit).map(normalizeSearchHit);
@@ -61,7 +62,7 @@ cli({
 
 function normalizeSearchHit(item) {
   const exchange = item.exchange ?? item.prefix ?? '';
-  const sym = item.symbol ?? '';
+  const sym = stripHl(item.symbol ?? '');
   return {
     symbol: exchange && sym ? `${exchange}:${sym}` : sym,
     description: stripHl(item.description ?? ''),
@@ -75,16 +76,4 @@ function normalizeSearchHit(item) {
 /** TradingView wraps query matches in <em> tags when hl=1. Strip them for plain output. */
 function stripHl(s) {
   return String(s).replace(/<\/?em>/g, '');
-}
-
-async function getJson(page, url) {
-  const script = `
-    (async () => {
-      const res = await fetch(${JSON.stringify(url)}, { credentials: 'include' });
-      const text = await res.text();
-      if (!res.ok) throw new Error('search ' + res.status + ': ' + text.slice(0, 200));
-      return JSON.parse(text);
-    })()
-  `;
-  return page.evaluate(script);
 }

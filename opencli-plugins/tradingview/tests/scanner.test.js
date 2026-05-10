@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildChainBody,
+  buildQuoteBody,
   decodeScannerRows,
   normalizeChainRow,
   strikesAroundSpot,
@@ -91,4 +93,31 @@ test('summarizeExpiries — aggregates contract counts per expiry', () => {
   assert.equal(summary[0].expiry, '2026-05-22');
   assert.equal(summary[0].dte, 12);
   assert.equal(summary[0].contracts_count, 2);
+});
+
+test('buildQuoteBody — tickers + columns shape', () => {
+  const body = buildQuoteBody('NASDAQ', 'MU');
+  assert.deepEqual(body.symbols.tickers, ['NASDAQ:MU']);
+  assert.ok(Array.isArray(body.columns));
+  assert.ok(body.columns.includes('close'));
+  assert.ok(body.columns.includes('description'));
+});
+
+test('buildChainBody — uses index_filters + filter2 (NOT markets/range)', () => {
+  // This shape was reverse-engineered from the live request the TradingView
+  // options-chain page sends. Critical that we don't regress it: the prior
+  // {markets,filter,range} shape returns HTTP 400 from the real server.
+  const body = buildChainBody('NASDAQ', 'MU');
+  assert.deepEqual(body.index_filters, [
+    { name: 'underlying_symbol', values: ['NASDAQ:MU'] },
+  ]);
+  assert.equal(body.filter2.operator, 'and');
+  assert.equal(body.filter2.operands[0].expression.left, 'type');
+  assert.equal(body.filter2.operands[0].expression.right, 'option');
+  assert.equal(body.ignore_unknown_fields, false);
+  assert.ok(Array.isArray(body.columns));
+  // Negative assertions — make sure the bad fields aren't there
+  assert.equal(body.markets, undefined);
+  assert.equal(body.filter, undefined);
+  assert.equal(body.range, undefined);
 });

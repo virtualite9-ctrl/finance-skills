@@ -26,6 +26,8 @@ Reads TradingView's desktop macOS app for quotes, options chains, and chart stat
 
 **Important**: Unlike browser-based opencli readers (twitter, linkedin), this one talks directly to a running TradingView desktop app over Chrome DevTools Protocol. The user must (a) have `TradingView.app` installed, and (b) be logged in inside that app. The plugin handles relaunching with the debug port.
 
+**How it works**: data commands harvest session cookies via CDP `Storage.getCookies`, then fire HTTP requests from Node directly. Page-context fetch is blocked by browser CORS preflight even from TradingView's own pages — the desktop app uses Electron's main process (Node network stack) to bypass this, and we replicate that path. No Browser Bridge extension required, no `apps.yaml` registration needed.
+
 ---
 
 ## Step 1: Ensure opencli + Plugin Are Installed and Ready
@@ -64,10 +66,11 @@ The `launch` step quits the running TradingView and reopens it with `--remote-de
 
 | Symptom | Fix |
 |---|---|
-| `opencli: command not found` | `npm install -g @jackwener/opencli` (Node ≥ 21) |
+| `opencli: command not found` | `npm install -g @jackwener/opencli` (Node ≥ 22 for built-in WebSocket) |
 | `Unknown command: tradingview` | `opencli plugin install github:himself65/finance-skills/tradingview` |
-| `CDP not reachable on :9222` | `opencli tradingview launch` to relaunch the app |
-| `No TradingView tab found` | App is open but logged out — log in inside the desktop app |
+| `Cannot reach CDP at http://127.0.0.1:9222` | App not launched with debug port — run `opencli tradingview launch` |
+| `No tradingview.com cookies found` | App is open but logged out — log in inside the desktop app |
+| `No TradingView tab found` | Open any chart or symbol page in TradingView, then retry |
 | Empty chain / 0 contracts | Subscription tier on the logged-in account doesn't include options for this symbol |
 
 ---
@@ -204,10 +207,11 @@ Returns CDP connection state and active TradingView tabs. If CDP is down, run `o
 | Error | Cause | Fix |
 |---|---|---|
 | `Unknown command: tradingview` | Plugin not installed | `opencli plugin install github:himself65/finance-skills/tradingview` |
-| `CDP not reachable on :9222` | App launched without debug port | `opencli tradingview launch` |
-| `No tab matches tradingview.com` | App open but no TradingView page loaded | Open any chart or symbol page in TradingView, then retry |
-| `Empty chain / status 200 / totalCount=0` | Subscription tier doesn't cover this symbol's options | Check account tier in the desktop app |
-| `Symbol not found` | Wrong exchange | Pass `--exchange` explicitly, or run a search first |
+| `Cannot reach CDP at http://127.0.0.1:9222` | App launched without debug port | `opencli tradingview launch` |
+| `No tradingview.com cookies found` | Logged out of TradingView | Log in inside the desktop app |
+| `No TradingView tab found` | App open but no TradingView page loaded | Open any chart or symbol page, then retry |
+| `scanner 400 / Empty chain / totalCount=0` | Subscription tier doesn't cover this symbol's options | Check account tier in the desktop app |
+| `Symbol not found` | Wrong exchange | Pass `--exchange` explicitly, or run `opencli tradingview search --query <name>` first |
 | Rate limited | Too many requests | Wait a few seconds, then retry |
 
 ---

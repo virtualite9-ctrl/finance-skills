@@ -1,6 +1,6 @@
 # opencli-plugin-tradingview
 
-Read-only [opencli](https://github.com/jackwener/opencli) adapter for the **TradingView desktop macOS app**. Exposes spot quotes, full options chains (with greeks/IV), expiries, chart state, and screenshots — all by attaching to a logged-in TradingView.app over Chrome DevTools Protocol. No API key, no cookie extraction.
+Read-only [opencli](https://github.com/jackwener/opencli) adapter for the **TradingView desktop macOS app**. Exposes spot quotes, full options chains (with greeks/IV), expiries, screener (stocks/crypto/forex/futures/bonds), news, alerts, watchlists, symbol search, chart state, and chart screenshots — all by attaching to a logged-in TradingView.app over Chrome DevTools Protocol. No API key.
 
 This plugin lives inside the [`himself65/finance-skills`](https://github.com/himself65/finance-skills) monorepo. Install it via opencli's monorepo subpath syntax:
 
@@ -11,7 +11,7 @@ opencli plugin install github:himself65/finance-skills/tradingview
 ## Install + launch
 
 ```bash
-# Prereqs: Node ≥ 21, TradingView.app installed and logged in
+# Prereqs: Node ≥ 22 (built-in WebSocket), TradingView.app installed + logged in
 npm install -g @jackwener/opencli
 opencli plugin install github:himself65/finance-skills/tradingview
 
@@ -20,6 +20,8 @@ opencli tradingview launch
 ```
 
 `launch` quits any running TradingView and reopens it with `--remote-debugging-port=9222`. Save chart layouts first.
+
+**Zero extra setup.** No `apps.yaml` registration, no Browser Bridge extension. The plugin attaches to CDP directly via Node's built-in WebSocket.
 
 ## Commands
 
@@ -69,12 +71,23 @@ All commands accept `-f json|yaml|md|csv|table`.
 
 ## Data path
 
-Both spot quotes and the options chain come from `scanner.tradingview.com`:
+The plugin replicates what TradingView's desktop app does internally — its main Electron process makes HTTP requests via Node's network stack, bypassing browser CORS. The plugin does the same:
 
-- `POST /global/scan2?label-product=symbols-options` → spot quote (~220 B)
-- `POST /options/scan2?label-product=symbols-options` → full chain (~750 KB / ~3,100 contracts on a typical name)
+1. Connect to the running app's CDP (`http://127.0.0.1:9222/json/version`)
+2. Open the browser-level WebSocket
+3. Call `Storage.getCookies` to harvest the user's `.tradingview.com` session cookies
+4. Fire HTTP requests from Node directly with those cookies in a `Cookie` header — no browser, no CORS preflight
 
-The plugin runs the `fetch()` call from inside a TradingView page context (via `page.evaluate`) so the desktop app's session cookies are attached automatically. Responses arrive in the standard `{fields, symbols}` compressed form; field positions are read from the response — never hard-coded.
+This was discovered the hard way: page-context `fetch()` from any TradingView page is blocked by CORS preflight, even though the website itself uses these endpoints. The `lib/cookies.js` module implements this auth flow once; commands then call `tradingViewFetch(url, init)`.
+
+**Endpoint families used:**
+- `scanner.tradingview.com/{market}/scan2` — quotes, options, screener (POST)
+- `news-headlines.tradingview.com/v2/{headlines,story}` — news (GET)
+- `pricealerts.tradingview.com/{list_alerts,...}` — alerts (GET)
+- `www.tradingview.com/api/v1/symbols_list/...` — watchlists (GET)
+- `symbol-search.tradingview.com/symbol_search/v3/` — search (GET)
+
+Scanner responses arrive in the standard `{fields, symbols}` compressed form; field positions are read from the response — never hard-coded. The options chain endpoint specifically requires `index_filters: [{name:'underlying_symbol', values:[...]}]` + `filter2` boolean composition, captured via Network domain inspection.
 
 ## Auth model
 
@@ -82,7 +95,12 @@ No bearer token, no API key. The adapter relies entirely on the desktop app's lo
 
 ## Status
 
-This is **v0.1 — needs PoC verification.** The shapes follow a working Python PoC (referenced in the [skill handoff](../../plugins/data-providers/skills/tradingview-reader/SKILL.md)) but the Node port has not yet been smoke-tested against a live TradingView.app. Field positions and CDP flow may need adjustment on first run.
+**v0.1 — verified live against TradingView desktop app on macOS.** All 12 commands smoke-tested end-to-end (quote → MU @ $746.81, options-chain → 7,426 contracts, news → 200 headlines, screener → top mcap, etc.). Wire shapes are the actual ones the desktop app uses (captured via CDP Network domain).
+
+Known limitations:
+- macOS only (`launch` uses `open -a TradingView`).
+- `chart-state` symbol/interval detection is best-effort — DOM selectors may need adjustment as TradingView updates the UI; the layout id and URL are always correct.
+- No tier-degraded gracefully — empty options chains may indicate the logged-in account's tier doesn't include that symbol's options.
 
 ## Layout
 
@@ -91,6 +109,8 @@ opencli-plugins/tradingview/
 ├── opencli-plugin.json        # plugin manifest
 ├── package.json               # Node package (type: module)
 ├── lib/
+│   ├── cookies.js             # CDP Storage.getCookies harvest + tradingViewFetch helper
+│   ├── cdp.js                 # CDP tab finder, Runtime.evaluate, Page.captureScreenshot
 │   ├── scanner.js             # POST helpers, {fields,symbols} decoder, screener body builder
 │   ├── symbols.js             # OPRA parser, expiry helpers
 │   └── news.js                # /v2/headlines + /v2/story + AST→text walker
@@ -104,13 +124,15 @@ opencli-plugins/tradingview/
 ├── news.js                    # /v2/headlines (list) + /v2/story (--id)
 ├── watchlists.js              # api/v1/symbols_list/{all,custom/<id>,colored/<c>}
 ├── alerts.js                  # pricealerts.tradingview.com (read-only)
-├── chart-state.js             # window.location + DOM hooks → symbol/interval
-├── screenshot.js              # Page.captureScreenshot → PNG
+├── chart-state.js             # CDP Runtime.evaluate → layout_id, symbol, interval, url
+├── screenshot.js              # CDP Page.captureScreenshot → PNG
 └── tests/
     ├── symbols.test.js        # OPRA parser, expiry helpers
-    ├── scanner.test.js        # decoder, normalize, ATM-band slicer, summarizer
+    ├── scanner.test.js        # decoder, normalize, ATM-band slicer, body builders
     ├── screener.test.js       # buildScreenerBody (limit clamping, sort, filter, tickers)
-    └── news.test.js           # AST walker, headline normalize, epoch helpers
+    ├── news.test.js           # AST walker, headline normalize, epoch helpers
+    ├── cookies.test.js        # endpoint resolution, header constants
+    └── alerts.test.js         # normalizeAlerts (live `r:[]` shape + fallbacks)
 ```
 
 ## License

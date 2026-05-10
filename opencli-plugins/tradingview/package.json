@@ -1,9 +1,12 @@
 {
   "name": "@himself65/opencli-plugin-tradingview",
   "version": "0.1.0",
-  "description": "Read-only opencli adapter for the TradingView desktop macOS app — spot quotes, options chains with greeks/IV, expiries, chart state, and screenshots via CDP.",
+  "description": "Read-only opencli adapter for the TradingView desktop macOS app — quotes, options chains with greeks/IV, expiries, screener (stocks/crypto/forex/futures/bonds), news, alerts, watchlists, search, chart state, screenshots — via CDP.",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test tests/*.test.js"
   },

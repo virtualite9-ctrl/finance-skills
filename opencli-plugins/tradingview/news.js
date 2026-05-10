@@ -9,9 +9,9 @@
 import { cli, Strategy } from '@jackwener/opencli/registry';
 import {
   astToText,
-  buildHeadlinesUrl,
-  buildStoryUrl,
   epochToIso,
+  fetchHeadlines,
+  fetchStory,
   normalizeHeadline,
 } from './lib/news.js';
 
@@ -19,9 +19,8 @@ cli({
   site: 'tradingview',
   name: 'news',
   description: 'TradingView news headlines (filterable) or full story detail by id',
-  domain: 'www.tradingview.com',
-  strategy: Strategy.UI,
-  browser: true,
+  strategy: Strategy.PUBLIC,
+  browser: false,
   args: [
     { name: 'id', help: 'Story id — when set, fetch full story instead of list' },
     { name: 'symbol', help: 'EXCH:SYM filter (omit for global feed)' },
@@ -44,16 +43,16 @@ cli({
     { name: 'limit', type: 'int', default: 25, help: 'Max headlines (default 25)' },
   ],
   columns: ['id', 'published', 'provider', 'title', 'urgency', 'related_symbols', 'link'],
-  func: async (page, args) => {
+  func: async (_page, args) => {
     if (args.id) {
-      return [await fetchStory(page, args)];
+      return [await fetchStoryRow(args)];
     }
-    return fetchHeadlines(page, args);
+    return fetchHeadlinesRows(args);
   },
 });
 
-async function fetchHeadlines(page, args) {
-  const url = buildHeadlinesUrl({
+async function fetchHeadlinesRows(args) {
+  const payload = await fetchHeadlines({
     symbol: args.symbol,
     category: args.category,
     area: args.area,
@@ -61,15 +60,13 @@ async function fetchHeadlines(page, args) {
     provider: args.provider,
     lang: args.lang,
   });
-  const payload = await getJson(page, url);
   const items = Array.isArray(payload?.items) ? payload.items : [];
   const limit = Math.max(1, Number(args.limit) || 25);
   return items.slice(0, limit).map((it) => normalizeHeadline(it));
 }
 
-async function fetchStory(page, args) {
-  const url = buildStoryUrl(String(args.id), args.lang || 'en');
-  const story = await getJson(page, url);
+async function fetchStoryRow(args) {
+  const story = await fetchStory(String(args.id), args.lang || 'en');
   const body = astToText(story?.astDescription).replace(/\n{3,}/g, '\n\n').trim();
   return {
     id: story?.id ?? args.id,
@@ -80,16 +77,4 @@ async function fetchStory(page, args) {
     tags: Array.isArray(story?.tags) ? story.tags.map((t) => t?.title ?? t).filter(Boolean).join(', ') : '',
     link: story?.link ?? (story?.storyPath ? `https://www.tradingview.com${story.storyPath}` : ''),
   };
-}
-
-async function getJson(page, url) {
-  const script = `
-    (async () => {
-      const res = await fetch(${JSON.stringify(url)}, { credentials: 'include' });
-      const text = await res.text();
-      if (!res.ok) throw new Error('news ' + res.status + ': ' + text.slice(0, 200));
-      return JSON.parse(text);
-    })()
-  `;
-  return page.evaluate(script);
 }

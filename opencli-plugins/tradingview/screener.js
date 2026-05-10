@@ -18,9 +18,8 @@ cli({
   name: 'screener',
   description:
     'Generic screener via scanner.tradingview.com — stocks (per country), crypto, forex, futures, bonds, ETFs',
-  domain: 'www.tradingview.com',
-  strategy: Strategy.UI,
-  browser: true,
+  strategy: Strategy.PUBLIC,
+  browser: false,
   args: [
     {
       name: 'market',
@@ -56,7 +55,7 @@ cli({
     { name: 'offset', type: 'int', default: 0, help: 'Pagination offset' },
   ],
   columns: ['symbol', 'name', 'close', 'change', 'volume', 'market_cap_basic', 'sector.tr'],
-  func: async (page, args) => {
+  func: async (_page, args) => {
     const market = String(args.market).toLowerCase().trim();
     const columns = String(args.columns).split(',').map((c) => c.trim()).filter(Boolean);
     if (columns.length === 0) {
@@ -79,7 +78,7 @@ cli({
       offset: Number(args.offset) || 0,
     });
 
-    const payload = await scannerFetch(page, `${encodeURIComponent(market)}/scan2`, body, {
+    const payload = await scannerFetch(`${encodeURIComponent(market)}/scan2`, body, {
       labelProduct: String(args['label-product'] || 'screener-stock'),
     });
     return decodeScannerRows(payload);

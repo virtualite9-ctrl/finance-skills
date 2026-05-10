@@ -6,8 +6,10 @@
  *   POST /global/scan2?label-product=symbols-options    → spot quotes
  *   POST /options/scan2?label-product=symbols-options   → full chain
  *
- * Auth comes from the user's TradingView desktop session — we run the fetch
- * from the page context (via `page.evaluate`) so cookies are attached.
+ * Auth: we replicate what the desktop app does internally — harvest cookies
+ * via CDP, then POST from Node directly. Browser-context fetch from
+ * tradingview.com pages is rejected by CORS preflight, so the page-context
+ * approach does NOT work, even though the website itself uses these calls.
  *
  * Responses use TradingView's compressed form:
  *   { totalCount, fields: [...], symbols: [{ s, f: [...] }, ...], time }
@@ -16,7 +18,8 @@
  * indices; the wire format can drift.
  */
 
-import { parseOpraSymbol, expirationToIso, daysToExpiry, buildTvSymbol } from './symbols.js';
+import { tradingViewFetch } from './cookies.js';
+import { expirationToIso, daysToExpiry, buildTvSymbol } from './symbols.js';
 
 const SCANNER_BASE = 'https://scanner.tradingview.com';
 
@@ -44,21 +47,27 @@ export function buildQuoteBody(exchange, ticker) {
 
 /**
  * Build the request body for the options-chain endpoint.
+ *
+ * Shape derived from the live request the TradingView options-chain page
+ * makes (captured via CDP Network domain). Critical bits:
+ *   - `index_filters` with `underlying_symbol` (NOT a `markets` field)
+ *   - `filter2` boolean composition (NOT the flat `filter` array)
+ *   - `ignore_unknown_fields: false`
+ *
  * @param {string} exchange "NASDAQ"
  * @param {string} ticker underlying (e.g. "SNDK")
  */
 export function buildChainBody(exchange, ticker) {
   return {
-    filter: [
-      { left: 'type', operation: 'equal', right: 'option' },
-      { left: 'root', operation: 'equal', right: String(ticker).toUpperCase() },
-    ],
-    options: { lang: 'en' },
-    markets: [String(exchange).toLowerCase()],
-    symbols: { query: { types: ['option'] } },
     columns: CHAIN_FIELDS,
-    sort: { sortBy: 'expiration', sortOrder: 'asc' },
-    range: [0, 5000],
+    ignore_unknown_fields: false,
+    index_filters: [
+      { name: 'underlying_symbol', values: [buildTvSymbol(exchange, ticker)] },
+    ],
+    filter2: {
+      operator: 'and',
+      operands: [{ expression: { left: 'type', operation: 'equal', right: 'option' } }],
+    },
   };
 }
 
@@ -171,33 +180,29 @@ export function summarizeExpiries(rows) {
 }
 
 /**
- * Run a scanner POST from inside the page context (so credentials are attached).
- * Caller must pass an opencli IPage. Returns the parsed JSON body.
+ * POST to a scanner.tradingview.com endpoint and return the parsed JSON body.
+ * Uses cookies harvested from CDP — works around the CORS-preflight rejection
+ * that blocks page-context fetch.
  *
- * @param {{evaluate: (s: string) => Promise<any>}} page
  * @param {string} endpoint  e.g. 'global/scan2', 'options/scan2', 'america/scan2'
  * @param {object} body
  * @param {object} [opts]
  * @param {string} [opts.labelProduct]  default 'symbols-options' (used by /global/scan2 + /options/scan2).
- *   Stocks screener uses 'screener-stock'; calendars use 'calendar-earnings' etc.
+ *   Stock screener uses 'screener-stock'; calendars use 'calendar-earnings' etc.
  */
-export async function scannerFetch(page, endpoint, body, opts = {}) {
+export async function scannerFetch(endpoint, body, opts = {}) {
   const labelProduct = opts.labelProduct ?? 'symbols-options';
   const url = `${SCANNER_BASE}/${endpoint}?label-product=${encodeURIComponent(labelProduct)}`;
-  const script = `
-    (async () => {
-      const res = await fetch(${JSON.stringify(url)}, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: ${JSON.stringify(JSON.stringify(body))},
-      });
-      const text = await res.text();
-      if (!res.ok) throw new Error('scanner ' + res.status + ': ' + text.slice(0, 200));
-      return JSON.parse(text);
-    })()
-  `;
-  return page.evaluate(script);
+  const res = await tradingViewFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`scanner ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json();
 }
 
 /**
