@@ -16,7 +16,7 @@ description: >
 
 # TradingView Reader (Read-Only)
 
-Reads TradingView's desktop macOS app for quotes, options chains, and chart state via [opencli](https://github.com/jackwener/opencli) and a CDP attach to the running TradingView.app process. Powered by the [`himself65/opencli-plugin-tradingview`](https://github.com/himself65/opencli-plugin-tradingview) plugin (separate from opencli's built-in adapters).
+Reads TradingView's desktop macOS app for quotes, options chains, and chart state via [opencli](https://github.com/jackwener/opencli) and a CDP attach to the running TradingView.app process. Powered by the `tradingview` plugin in this repo's [`opencli-plugins/tradingview`](https://github.com/himself65/finance-skills/tree/main/opencli-plugins/tradingview) tree (a separate plugin from opencli's built-in adapters, installed via opencli's monorepo subpath syntax).
 
 **This skill is read-only.** Designed for analysis: pulling options chains, checking IV/greeks, capturing chart state. It does NOT place trades, post ideas, modify watchlists, or change chart layouts.
 
@@ -48,7 +48,7 @@ The TradingView adapter is **not** built into opencli — it's a separate plugin
 
 ```bash
 # Install the plugin
-opencli plugin install github:himself65/opencli-plugin-tradingview
+opencli plugin install github:himself65/finance-skills/tradingview
 
 # Relaunch TradingView.app with CDP enabled (one-time per session)
 opencli tradingview launch
@@ -61,7 +61,7 @@ The `launch` step quits the running TradingView and reopens it with `--remote-de
 | Symptom | Fix |
 |---|---|
 | `opencli: command not found` | `npm install -g @jackwener/opencli` (Node ≥ 21) |
-| `Unknown command: tradingview` | `opencli plugin install github:himself65/opencli-plugin-tradingview` |
+| `Unknown command: tradingview` | `opencli plugin install github:himself65/finance-skills/tradingview` |
 | `CDP not reachable on :9222` | `opencli tradingview launch` to relaunch the app |
 | `No TradingView tab found` | App is open but logged out — log in inside the desktop app |
 | Empty chain / 0 contracts | Subscription tier on the logged-in account doesn't include options for this symbol |
@@ -147,7 +147,7 @@ Returns CDP connection state and active TradingView tabs. If CDP is down, run `o
 
 | Error | Cause | Fix |
 |---|---|---|
-| `Unknown command: tradingview` | Plugin not installed | `opencli plugin install github:himself65/opencli-plugin-tradingview` |
+| `Unknown command: tradingview` | Plugin not installed | `opencli plugin install github:himself65/finance-skills/tradingview` |
 | `CDP not reachable on :9222` | App launched without debug port | `opencli tradingview launch` |
 | `No tab matches tradingview.com` | App open but no TradingView page loaded | Open any chart or symbol page in TradingView, then retry |
 | `Empty chain / status 200 / totalCount=0` | Subscription tier doesn't cover this symbol's options | Check account tier in the desktop app |

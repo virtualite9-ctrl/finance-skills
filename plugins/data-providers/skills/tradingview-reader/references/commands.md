@@ -1,8 +1,8 @@
 # opencli TradingView Command Reference (Read-Only)
 
-Complete read-only reference for the `tradingview` adapter shipped by [`himself65/opencli-plugin-tradingview`](https://github.com/himself65/opencli-plugin-tradingview), scoped to financial research use cases.
+Complete read-only reference for the `tradingview` opencli adapter that lives in this repo's [`opencli-plugins/tradingview`](../../../../opencli-plugins/tradingview/) tree, scoped to financial research use cases.
 
-Install: `npm install -g @jackwener/opencli && opencli plugin install github:himself65/opencli-plugin-tradingview`
+Install: `npm install -g @jackwener/opencli && opencli plugin install github:himself65/finance-skills/tradingview`
 
 **This skill is read-only.** No write operations, no trade execution.
 
@@ -272,7 +272,7 @@ opencli tradingview screenshot --output ~/research/sndk-2026-05-10.png
 
 | Error | Cause | Fix |
 |---|---|---|
-| `Unknown command: tradingview` | Plugin not installed | `opencli plugin install github:himself65/opencli-plugin-tradingview` |
+| `Unknown command: tradingview` | Plugin not installed | `opencli plugin install github:himself65/finance-skills/tradingview` |
 | `CDP not reachable on :9222` | App launched without debug port | `opencli tradingview launch` |
 | `No tab matches tradingview.com` | App open but no TradingView page loaded | Open any chart in TradingView, then retry |
 | `Empty chain / totalCount=0` | Subscription tier doesn't cover this symbol's options | Check account tier in the desktop app |

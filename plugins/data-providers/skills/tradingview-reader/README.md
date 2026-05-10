@@ -1,6 +1,6 @@
 # tradingview-reader
 
-Read-only TradingView desktop reader for market data via [opencli](https://github.com/jackwener/opencli) + the [`opencli-plugin-tradingview`](https://github.com/himself65/opencli-plugin-tradingview) plugin.
+Read-only TradingView desktop reader for market data via [opencli](https://github.com/jackwener/opencli) + the [`tradingview`](../../../../opencli-plugins/tradingview/) opencli plugin shipped alongside this skill.
 
 ## What it does
 
@@ -49,7 +49,7 @@ See the [main README](../../../../README.md) for more installation options.
 
 - Node.js >= 21 — for `npm install -g @jackwener/opencli`
 - `TradingView.app` installed on macOS, logged in
-- The `opencli-plugin-tradingview` plugin: `opencli plugin install github:himself65/opencli-plugin-tradingview`
+- The `tradingview` opencli plugin: `opencli plugin install github:himself65/finance-skills/tradingview` (installs from this repo's monorepo subpath)
 - Relaunch with CDP enabled: `opencli tradingview launch` (one-time per session — warn the user to save chart layouts first)
 
 ## Reference files
