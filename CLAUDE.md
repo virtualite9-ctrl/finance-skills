@@ -152,7 +152,8 @@ When a skill is invoked as a plugin, it is namespaced as `<plugin-name>:<skill-n
 ## CI/CD
 
 - **Release workflow** (`.github/workflows/release-skills.yml`): On tag push (`v*`), zips each skill from `plugins/*/skills/*/` and publishes them as a GitHub release. These zips can be uploaded to Claude.ai for web/desktop users.
-- **Lint workflow** (`.github/workflows/skill-lint.yml`): Lints all `SKILL.md` files across all plugin groups.
+- **Lint workflow** (`.github/workflows/skill-lint.yml`): Lints all `SKILL.md` files across all plugin groups. The linter caps `description` at 1024 chars and rejects angle brackets (`<` / `>`).
+- **opencli plugin tests** (`.github/workflows/opencli-plugin-test.yml`): Walks `opencli-plugins/*/` and runs `npm test` for each plugin that has a `package.json` and `tests/*.test.js`. Pure-JS unit tests only — wire-level integration (CDP attach, scanner endpoints) is out of scope and must be PoC-verified against a real desktop app.
 
 ## opencli plugins
 
