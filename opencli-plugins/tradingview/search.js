@@ -19,6 +19,7 @@ cli({
   name: 'search',
   description: 'Symbol search / autocomplete (returns ticker, exchange, type, country, description)',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'query', required: true, help: 'Search text (e.g. "AAPL", "apple", "BINANCE:BTC")' },
@@ -34,7 +35,7 @@ cli({
     { name: 'offset', type: 'int', default: 0, help: 'Pagination start' },
   ],
   columns: ['symbol', 'description', 'type', 'exchange', 'country', 'currency'],
-  func: async (_page, args) => {
+  func: async (args) => {
     const params = new URLSearchParams();
     params.set('text', String(args.query));
     params.set('hl', '1');

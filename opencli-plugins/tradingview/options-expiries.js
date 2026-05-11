@@ -16,6 +16,7 @@ cli({
   name: 'options-expiries',
   description: 'List available options expirations with DTE and contract count',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'ticker', required: true, help: 'Underlying ticker' },
@@ -28,7 +29,7 @@ cli({
     },
   ],
   columns: ['expiry', 'dte', 'contracts_count'],
-  func: async (_page, args) => {
+  func: async (args) => {
     const ticker = String(args.ticker).toUpperCase().trim();
     const exchange = String(args.exchange).toUpperCase().trim();
     const includeExpired = Boolean(args['include-expired']);

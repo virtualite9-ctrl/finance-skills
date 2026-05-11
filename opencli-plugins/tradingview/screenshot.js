@@ -13,13 +13,14 @@ cli({
   name: 'screenshot',
   description: 'PNG screenshot of an active TradingView chart tab',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'tab', help: 'Tab id (from `opencli tradingview status`). Default: first chart tab.' },
     { name: 'output', help: 'Output PNG path (default: ~/tradingview-<timestamp>.png)' },
   ],
   columns: ['path', 'bytes', 'tab_id'],
-  func: async (_page, args) => {
+  func: async (args) => {
     const tab = await pickTab(args.tab);
     const outPath = resolveOutputPath(args.output);
     const png = await screenshotTab(tab);

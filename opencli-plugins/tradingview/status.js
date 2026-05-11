@@ -14,6 +14,7 @@ cli({
   name: 'status',
   description: 'CDP connection state and active TradingView tabs',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [],
   columns: ['connected', 'tabs'],

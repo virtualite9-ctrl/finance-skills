@@ -13,13 +13,14 @@ cli({
   name: 'quote',
   description: 'Single-symbol spot quote (close, change, currency)',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'ticker', required: true, help: 'Symbol (e.g. AAPL)' },
     { name: 'exchange', default: 'NASDAQ', help: 'TradingView exchange code (NASDAQ, NYSE, NYSEARCA, ...)' },
   ],
   columns: ['symbol', 'description', 'close', 'change', 'change_abs', 'currency', 'time'],
-  func: async (_page, args) => {
+  func: async (args) => {
     const ticker = String(args.ticker).toUpperCase().trim();
     const exchange = String(args.exchange).toUpperCase().trim();
 

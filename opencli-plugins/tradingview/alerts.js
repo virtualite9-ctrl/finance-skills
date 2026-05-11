@@ -31,6 +31,7 @@ cli({
   name: 'alerts',
   description: 'TradingView price alerts (read-only): list, active, triggered, offline-fires, log',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     {
@@ -41,7 +42,7 @@ cli({
     },
   ],
   columns: ['id', 'name', 'symbol', 'type', 'condition', 'value', 'active', 'status', 'fired_at'],
-  func: async (_page, args) => {
+  func: async (args) => {
     const which = String(args.type || 'list').toLowerCase();
     const path = ENDPOINTS[which];
     if (!path) throw new Error(`Unknown alerts --type: ${which}. One of: ${Object.keys(ENDPOINTS).join(', ')}`);

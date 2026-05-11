@@ -19,6 +19,7 @@ cli({
   description:
     'Generic screener via scanner.tradingview.com — stocks (per country), crypto, forex, futures, bonds, ETFs',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     {
@@ -55,7 +56,7 @@ cli({
     { name: 'offset', type: 'int', default: 0, help: 'Pagination offset' },
   ],
   columns: ['symbol', 'name', 'close', 'change', 'volume', 'market_cap_basic', 'sector.tr'],
-  func: async (_page, args) => {
+  func: async (args) => {
     const market = String(args.market).toLowerCase().trim();
     const columns = String(args.columns).split(',').map((c) => c.trim()).filter(Boolean);
     if (columns.length === 0) {

@@ -18,12 +18,13 @@ cli({
   name: 'launch',
   description: 'Relaunch TradingView.app with --remote-debugging-port enabled (macOS only)',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'port', type: 'int', default: DEFAULT_PORT, help: `CDP port (default ${DEFAULT_PORT})` },
   ],
   columns: ['port', 'pid', 'ready'],
-  func: async (_page, args) => {
+  func: async (args) => {
     if (platform() !== 'darwin') {
       throw new Error('tradingview launch is macOS-only (uses `open -a TradingView`).');
     }

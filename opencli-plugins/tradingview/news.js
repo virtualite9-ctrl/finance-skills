@@ -20,6 +20,7 @@ cli({
   name: 'news',
   description: 'TradingView news headlines (filterable) or full story detail by id',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'id', help: 'Story id — when set, fetch full story instead of list' },
@@ -43,7 +44,7 @@ cli({
     { name: 'limit', type: 'int', default: 25, help: 'Max headlines (default 25)' },
   ],
   columns: ['id', 'published', 'provider', 'title', 'urgency', 'related_symbols', 'link'],
-  func: async (_page, args) => {
+  func: async (args) => {
     if (args.id) {
       return [await fetchStoryRow(args)];
     }

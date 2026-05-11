@@ -21,6 +21,7 @@ cli({
   name: 'watchlists',
   description: 'TradingView watchlists (read-only): list all, fetch by id, or fetch colored-flag list',
   strategy: Strategy.PUBLIC,
+  access: 'read',
   browser: false,
   args: [
     { name: 'id', help: 'Watchlist id (numeric or 8-char alphanumeric). When set, returns symbols of that watchlist.' },
@@ -31,7 +32,7 @@ cli({
     },
   ],
   columns: ['id', 'name', 'symbol_count', 'symbols'],
-  func: async (_page, args) => {
+  func: async (args) => {
     if (args.id && args.color) {
       throw new Error('--id and --color are mutually exclusive');
     }
